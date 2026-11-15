@@ -168,9 +168,14 @@
             <div class="text-xs font-extrabold text-slate-300">[ 왼쪽 참가석 ]</div>
             <div id="leftPlayerName" class="text-sm font-black text-blue-400 mt-1">빈 자리 (입장 대기중)</div>
           </div>
-          <button id="joinLeftBtn" type="button" class="w-full py-2 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white shadow transition cursor-pointer">
-            왼쪽 자리 참가하기
-          </button>
+          <div class="w-full flex items-center gap-1.5">
+            <button id="joinLeftBtn" type="button" class="flex-1 py-2 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white shadow transition cursor-pointer">
+              왼쪽 자리 참가하기
+            </button>
+            <button id="cancelLeftBtn" type="button" class="hidden shrink-0 px-3 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow transition cursor-pointer">
+              대기취소
+            </button>
+          </div>
         </div>
 
         <!-- 오른쪽 참가석 -->
@@ -180,9 +185,14 @@
             <div class="text-xs font-extrabold text-slate-300">[ 오른쪽 참가석 ]</div>
             <div id="rightPlayerName" class="text-sm font-black text-rose-400 mt-1">빈 자리 (입장 대기중)</div>
           </div>
-          <button id="joinRightBtn" type="button" class="w-full py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow transition cursor-pointer">
-            오른쪽 자리 참가하기
-          </button>
+          <div class="w-full flex items-center gap-1.5">
+            <button id="joinRightBtn" type="button" class="flex-1 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow transition cursor-pointer">
+              오른쪽 자리 참가하기
+            </button>
+            <button id="cancelRightBtn" type="button" class="hidden shrink-0 px-3 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow transition cursor-pointer">
+              대기취소
+            </button>
+          </div>
         </div>
       </div>
 
@@ -1175,43 +1185,59 @@
         const rightNameEl = document.getElementById('rightPlayerName');
         const joinLeftBtn = document.getElementById('joinLeftBtn');
         const joinRightBtn = document.getElementById('joinRightBtn');
+        const cancelLeftBtn = document.getElementById('cancelLeftBtn');
+        const cancelRightBtn = document.getElementById('cancelRightBtn');
 
         if (leftP) {
           const isMeL = leftP.socketId === socket.id;
+          const hasTagL = /\[.+\]/.test(leftP.username || '');
           const lSkin = isMeL ? getEquippedSkin().name : (SKINS.find(sk => sk.id === leftP.skinId)?.name || '');
-          leftNameEl.textContent = `${leftP.username}${lSkin ? ' (' + lSkin + ')' : ''} · 참가 대기중`;
+          leftNameEl.textContent = isMeL
+            ? `${getDisplayName()} [${lSkin}] · 참가 대기중`
+            : `${leftP.username}${!hasTagL && lSkin ? ' [' + lSkin + ']' : ''} · 참가 대기중`;
           if (isMeL) {
             joinLeftBtn.textContent = `⏳ 참가 대기중 (${lSkin})`;
-            joinLeftBtn.disabled = false;
-            joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
+            joinLeftBtn.disabled = true;
+            joinLeftBtn.className = 'flex-1 py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-default';
+            cancelLeftBtn.classList.remove('hidden');
           } else {
             joinLeftBtn.textContent = '다른 유저 선점됨';
             joinLeftBtn.disabled = true;
+            joinLeftBtn.className = 'flex-1 py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-400 transition cursor-not-allowed';
+            cancelLeftBtn.classList.add('hidden');
           }
         } else {
           leftNameEl.textContent = '빈 자리 (입장 대기중)';
           joinLeftBtn.textContent = '왼쪽 자리 참가하기';
           joinLeftBtn.disabled = false;
-          joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white shadow transition cursor-pointer';
+          joinLeftBtn.className = 'flex-1 py-2 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white shadow transition cursor-pointer';
+          cancelLeftBtn.classList.add('hidden');
         }
 
         if (rightP) {
           const isMeR = rightP.socketId === socket.id;
+          const hasTagR = /\[.+\]/.test(rightP.username || '');
           const rSkin = isMeR ? getEquippedSkin().name : (SKINS.find(sk => sk.id === rightP.skinId)?.name || '');
-          rightNameEl.textContent = `${rightP.username}${rSkin ? ' (' + rSkin + ')' : ''} · 참가 대기중`;
+          rightNameEl.textContent = isMeR
+            ? `${getDisplayName()} [${rSkin}] · 참가 대기중`
+            : `${rightP.username}${!hasTagR && rSkin ? ' [' + rSkin + ']' : ''} · 참가 대기중`;
           if (isMeR) {
             joinRightBtn.textContent = `⏳ 참가 대기중 (${rSkin})`;
-            joinRightBtn.disabled = false;
-            joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
+            joinRightBtn.disabled = true;
+            joinRightBtn.className = 'flex-1 py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-default';
+            cancelRightBtn.classList.remove('hidden');
           } else {
             joinRightBtn.textContent = '다른 유저 선점됨';
             joinRightBtn.disabled = true;
+            joinRightBtn.className = 'flex-1 py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-400 transition cursor-not-allowed';
+            cancelRightBtn.classList.add('hidden');
           }
         } else {
           rightNameEl.textContent = '빈 자리 (입장 대기중)';
           joinRightBtn.textContent = '오른쪽 자리 참가하기';
           joinRightBtn.disabled = false;
-          joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow transition cursor-pointer';
+          joinRightBtn.className = 'flex-1 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow transition cursor-pointer';
+          cancelRightBtn.classList.add('hidden');
         }
 
         const startBtn = document.getElementById('pvpStartMatchBtn');
@@ -1352,23 +1378,41 @@
         return myGuestName;
       }
 
+      const cancelLeftBtn = document.getElementById('cancelLeftBtn');
+      const cancelRightBtn = document.getElementById('cancelRightBtn');
+
       joinLeftBtn.addEventListener('click', () => {
-        const username = getDisplayName();
+        const baseName = getDisplayName();
         const skin = getEquippedSkin();
-        document.getElementById('leftPlayerName').textContent = `${username} (${skin.name}) · 참가 대기중`;
+        const taggedName = `${baseName} [${skin.name}]`;
+        document.getElementById('leftPlayerName').textContent = `${taggedName} · 참가 대기중`;
         joinLeftBtn.textContent = `⏳ 참가 대기중 (${skin.name})`;
-        joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
-        socket.emit('join_pvp_lobby', { username, slot: 'left', skinId: skin.id });
+        joinLeftBtn.disabled = true;
+        joinLeftBtn.className = 'flex-1 py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-default';
+        cancelLeftBtn.classList.remove('hidden');
+        socket.emit('join_pvp_lobby', { username: taggedName, slot: 'left', skinId: skin.id });
       });
 
       joinRightBtn.addEventListener('click', () => {
-        const username = getDisplayName();
+        const baseName = getDisplayName();
         const skin = getEquippedSkin();
-        document.getElementById('rightPlayerName').textContent = `${username} (${skin.name}) · 참가 대기중`;
+        const taggedName = `${baseName} [${skin.name}]`;
+        document.getElementById('rightPlayerName').textContent = `${taggedName} · 참가 대기중`;
         joinRightBtn.textContent = `⏳ 참가 대기중 (${skin.name})`;
-        joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
-        socket.emit('join_pvp_lobby', { username, slot: 'right', skinId: skin.id });
+        joinRightBtn.disabled = true;
+        joinRightBtn.className = 'flex-1 py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-default';
+        cancelRightBtn.classList.remove('hidden');
+        socket.emit('join_pvp_lobby', { username: taggedName, slot: 'right', skinId: skin.id });
       });
+
+      function cancelPvpWait() {
+        socket.emit('leave_pvp_lobby');
+        lastLobbyPlayers = lastLobbyPlayers.filter(p => p.socketId !== socket.id);
+        renderLobbySlots(lastLobbyPlayers);
+        showToast('대기를 취소했습니다.');
+      }
+      cancelLeftBtn.addEventListener('click', cancelPvpWait);
+      cancelRightBtn.addEventListener('click', cancelPvpWait);
 
       pvpStartMatchBtn.addEventListener('click', () => {
         socket.emit('start_pvp_match');
