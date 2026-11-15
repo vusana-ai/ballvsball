@@ -456,6 +456,7 @@
       let socket = { emit: () => {}, on: () => {}, connected: false, id: 'local' };
       let myGuestName = null;
       let waitingPlayers = [];
+      let lastLobbyPlayers = [];
 
       function renderWaitingList(list) {
         const box = document.getElementById('waitingListBox');
@@ -1162,11 +1163,11 @@
         renderWaitingList(waitingPlayers);
       });
 
-      socket.on('update_lobby', (players) => {
-        renderWaitingList(players);
-        const leftP = players.find(p => p.slot === 'left');
-        const rightP = players.find(p => p.slot === 'right');
-        const count = players.length;
+      function renderLobbySlots(players) {
+        lastLobbyPlayers = Array.isArray(players) ? players : [];
+        const leftP = lastLobbyPlayers.find(p => p.slot === 'left');
+        const rightP = lastLobbyPlayers.find(p => p.slot === 'right');
+        const count = lastLobbyPlayers.length;
 
         document.getElementById('lobbyStatusBadge').textContent = `대기 중 (${count}/2)`;
 
@@ -1176,9 +1177,10 @@
         const joinRightBtn = document.getElementById('joinRightBtn');
 
         if (leftP) {
-          const lSkin = SKINS.find(sk => sk.id === leftP.skinId)?.name || '기본공';
-          leftNameEl.textContent = `${leftP.username} (${lSkin}) · 참가 대기중`;
-          if (leftP.socketId === socket.id) {
+          const isMeL = leftP.socketId === socket.id;
+          const lSkin = isMeL ? getEquippedSkin().name : (SKINS.find(sk => sk.id === leftP.skinId)?.name || '');
+          leftNameEl.textContent = `${leftP.username}${lSkin ? ' (' + lSkin + ')' : ''} · 참가 대기중`;
+          if (isMeL) {
             joinLeftBtn.textContent = `⏳ 참가 대기중 (${lSkin})`;
             joinLeftBtn.disabled = false;
             joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
@@ -1194,9 +1196,10 @@
         }
 
         if (rightP) {
-          const rSkin = SKINS.find(sk => sk.id === rightP.skinId)?.name || '기본공';
-          rightNameEl.textContent = `${rightP.username} (${rSkin}) · 참가 대기중`;
-          if (rightP.socketId === socket.id) {
+          const isMeR = rightP.socketId === socket.id;
+          const rSkin = isMeR ? getEquippedSkin().name : (SKINS.find(sk => sk.id === rightP.skinId)?.name || '');
+          rightNameEl.textContent = `${rightP.username}${rSkin ? ' (' + rSkin + ')' : ''} · 참가 대기중`;
+          if (isMeR) {
             joinRightBtn.textContent = `⏳ 참가 대기중 (${rSkin})`;
             joinRightBtn.disabled = false;
             joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
@@ -1221,6 +1224,11 @@
           startBtn.className = 'px-5 py-2.5 rounded-xl bg-slate-800 text-slate-500 border border-slate-700 font-black text-xs sm:text-sm transition cursor-not-allowed';
           document.getElementById('pvpNoticeText').textContent = '양쪽 참가자가 모두 입장해야 시작할 수 있습니다.';
         }
+      }
+
+      socket.on('update_lobby', (players) => {
+        renderWaitingList(players);
+        renderLobbySlots(players);
       });
 
       socket.on('lobby_error', (msg) => { showToast(msg); });
@@ -1447,6 +1455,7 @@
               state.equippedSkinId = sk.id;
               saveState(true);
               updateUI();
+              if (lastLobbyPlayers.length) renderLobbySlots(lastLobbyPlayers);
               showToast(`⚽ 대전 공 [${sk.name}] 선택됨!`);
             };
             pvpGrid.appendChild(pBtn);
