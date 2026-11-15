@@ -219,6 +219,11 @@
       <div id="canvasWrapper" class="relative w-full h-[380px] sm:h-[440px] cursor-pointer bg-slate-950">
         <canvas id="gameCanvas" class="absolute inset-0 w-full h-full block"></canvas>
 
+        <!-- 3-2-1 카운트다운 오버레이 -->
+        <div id="countdownOverlay" class="pointer-events-none absolute inset-0 z-20 hidden items-center justify-center bg-black/45">
+          <div id="countdownText" class="text-6xl sm:text-7xl font-black text-amber-300 drop-shadow-[0_4px_20px_rgba(251,191,36,0.8)]">3</div>
+        </div>
+
         <!-- 라운드 승리/패배 중앙 결과 창 (준비완료 / 포기 버튼) -->
         <div id="roundResultOverlay" class="absolute inset-0 z-20 hidden items-center justify-center bg-black/60 backdrop-blur-[2px]">
           <div class="bg-slate-900/95 border-2 border-blue-400/80 rounded-2xl px-7 py-5 text-center shadow-2xl max-w-xs w-[90%]">
@@ -246,7 +251,7 @@
           <div id="playerUiBox" class="flex-1 min-w-0 bg-slate-900/90 border border-blue-500 px-2.5 sm:px-3 py-1.5 rounded-xl backdrop-blur-sm flex flex-col gap-1 transition-all duration-300">
             <div class="flex justify-between text-[10px] sm:text-[11px] font-bold text-blue-300 gap-1" id="playerLabelContainer">
               <span id="playerLabelName" class="truncate">🔵 아군 공</span>
-              <span id="playerHpText" class="shrink-0 tabular-nums">100 / 100</span>
+              <span id="playerHpText" class="shrink-0 tabular-nums">1000 / 1000</span>
             </div>
             <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
               <div id="playerHpBar" class="h-full bg-blue-500 transition-all duration-75" style="width: 100%;"></div>
@@ -260,7 +265,7 @@
           <div id="enemyUiBox" class="flex-1 min-w-0 bg-slate-900/90 border border-rose-500 px-2.5 sm:px-3 py-1.5 rounded-xl backdrop-blur-sm flex flex-col gap-1 transition-all duration-300">
             <div class="flex justify-between text-[10px] sm:text-[11px] font-bold text-rose-300 gap-1" id="enemyLabelContainer">
               <span id="enemyLabelName" class="truncate">🔴 적 공 (AI)</span>
-              <span id="enemyHpText" class="shrink-0 tabular-nums">100 / 100</span>
+              <span id="enemyHpText" class="shrink-0 tabular-nums">1000 / 1000</span>
             </div>
             <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
               <div id="enemyHpBar" class="h-full bg-rose-500 transition-all duration-75" style="width: 100%;"></div>
@@ -698,21 +703,23 @@
       }
       window.addEventListener('resize', resizeCanvas);
 
-      let playerBall = { x: 160, y: 200, vx: 2.8, vy: 2.0, radius: 38, hp: 100, maxHp: 100, skillTimer: 0, daggerAngle: 0, daggerCd: 0 };
-      let enemyBall = { x: 640, y: 200, vx: -2.8, vy: -2.0, radius: 38, hp: 100, maxHp: 100, skillTimer: 0, vampireTimer: 0, vampireAcc: 0, virusTimer: 0, virusAcc: 0, daggerAngle: 0, daggerCd: 0 };
+      let playerBall = { x: 160, y: 200, vx: 2.8, vy: 2.0, radius: 38, hp: 1000, maxHp: 1000, skillTimer: 0, daggerAngle: 0, daggerCd: 0 };
+      let enemyBall = { x: 640, y: 200, vx: -2.8, vy: -2.0, radius: 38, hp: 1000, maxHp: 1000, skillTimer: 0, vampireTimer: 0, vampireAcc: 0, virusTimer: 0, virusAcc: 0, daggerAngle: 0, daggerCd: 0 };
       let playerVampireTimer = 0, playerVampireAcc = 0, playerVirusTimer = 0, playerVirusAcc = 0;
       let projectiles = [];
       let particles = [];
       let webs = [];
       let matchScore = { player: 0, enemy: 0 };
       let battleActive = true;
+      let myReady = false, opponentReady = false, roundSeq = 1;
+      let countdownTimer = null;
 
       function resetRound() {
         playerBall.x = canvasWidth * 0.25;
         playerBall.y = canvasHeight * 0.5;
         playerBall.vx = (Math.random() - 0.5) * 3 + 2.5;
         playerBall.vy = (Math.random() - 0.5) * 3;
-        playerBall.maxHp = 100;
+        playerBall.maxHp = 1000;
         playerBall.hp = playerBall.maxHp;
 
         enemyBall.x = canvasWidth * 0.75;
@@ -731,18 +738,46 @@
         if (currentMode === 'practice') {
           const blueSkin = getEquippedSkin();
           const currentAiSkin = getEnemySkin();
-          enemyBall.maxHp = 100;
-          enemyBall.hp = 100;
+          enemyBall.maxHp = 1000;
+          enemyBall.hp = 1000;
           const myId = getDisplayName();
           document.getElementById('playerLabelName').textContent = `🔵 ${myId} (${blueSkin.name})`;
           document.getElementById('enemyLabelName').textContent = `🔴 AI (${currentAiSkin.name})`;
           document.getElementById('aiStageDisplay').textContent = `${myId}: ${blueSkin.name} vs AI: ${currentAiSkin.name}`;
         } else {
-          enemyBall.maxHp = 100;
-          enemyBall.hp = 100;
+          enemyBall.maxHp = 1000;
+          enemyBall.hp = 1000;
         }
         document.getElementById('matchScoreText').textContent = `${matchScore.player} : ${matchScore.enemy}`;
-        battleActive = true;
+        myReady = false;
+        opponentReady = false;
+        battleActive = false;
+        startCountdown();
+      }
+
+      function startCountdown() {
+        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+        const co = document.getElementById('countdownOverlay');
+        const ct = document.getElementById('countdownText');
+        if (!co || !ct) { battleActive = true; return; }
+        let n = 3;
+        ct.textContent = String(n);
+        co.classList.remove('hidden');
+        co.classList.add('flex');
+        countdownTimer = setInterval(() => {
+          n--;
+          if (n > 0) {
+            ct.textContent = String(n);
+          } else if (n === 0) {
+            ct.textContent = 'GO!';
+          } else {
+            clearInterval(countdownTimer);
+            countdownTimer = null;
+            co.classList.add('hidden');
+            co.classList.remove('flex');
+            battleActive = true;
+          }
+        }, 520);
       }
 
       function getEquippedSkin() {
@@ -768,7 +803,8 @@
           const dt = lastTime ? Math.min(0.05, (timestamp - lastTime) / 1000) : 0.016;
           lastTime = timestamp;
 
-          if (battleActive) {
+          const isHost = currentMode !== 'pvp' || pvpRole === 'left';
+          if (battleActive && isHost) {
             playerBall.x += playerBall.vx;
             playerBall.y += playerBall.vy;
             enemyBall.x += enemyBall.vx;
@@ -950,39 +986,30 @@
               else matchScore.enemy += 1;
               document.getElementById('matchScoreText').textContent = `${matchScore.player} : ${matchScore.enemy}`;
 
-              const enemyDisplay = currentMode === 'practice'
-                ? 'AI'
-                : (document.getElementById('enemyLabelName').textContent.replace(/^[🔴🔵]\s*/, '') || '상대');
-              const resultText = playerWonRound
-                ? `${getDisplayName()} 승리!`
-                : `${enemyDisplay} 승리!`;
-
-              if (currentMode === 'pvp') {
-                if (playerWonRound) state.wins += 1;
-                else state.losses += 1;
-                saveState(true);
+              if (currentMode === 'pvp' && pvpRoomName) {
+                socket.emit('sync_game_state', {
+                  room: pvpRoomName,
+                  role: pvpRole,
+                  hostState: true,
+                  leftBall: { x: playerBall.x, y: playerBall.y, hp: playerBall.hp, maxHp: playerBall.maxHp },
+                  rightBall: { x: enemyBall.x, y: enemyBall.y, hp: enemyBall.hp, maxHp: enemyBall.maxHp },
+                  matchScore,
+                  roundOver: true,
+                  winnerSide: playerWonRound ? 'left' : 'right',
+                  roundSeq
+                });
               }
-              const readyBtn = document.getElementById('roundReadyBtn');
-              readyBtn.disabled = false;
-              readyBtn.textContent = '✅ 준비완료';
-              readyBtn.className = 'py-2.5 px-3 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow transition cursor-pointer';
-              document.getElementById('roundReadyStatus').textContent = currentMode === 'pvp'
-                ? '양쪽 모두 [준비완료]를 눌러야 재대결이 시작됩니다'
-                : '재대결하려면 [준비완료]를 누르세요';
-              const ro = document.getElementById('roundResultOverlay');
-              document.getElementById('roundResultTitle').textContent = (playerWonRound ? '🏆 ' : '💥 ') + resultText;
-              document.getElementById('roundResultTitle').className = 'text-xl sm:text-2xl font-black ' + (playerWonRound ? 'text-amber-300' : 'text-rose-400');
-              document.getElementById('roundResultSub').textContent = `현재 스코어 ${matchScore.player} : ${matchScore.enemy}`;
-              ro.classList.remove('hidden');
-              ro.classList.add('flex');
+              showRoundResultOverlay(playerWonRound ? 'left' : 'right');
             }
 
-            if (currentMode === 'pvp' && pvpRoomName) {
+            if (currentMode === 'pvp' && pvpRoomName && pvpRole === 'left') {
               socket.emit('sync_game_state', {
                 room: pvpRoomName,
                 role: pvpRole,
-                ball: pvpRole === 'left' ? playerBall : enemyBall,
-                hp: pvpRole === 'left' ? playerBall.hp : enemyBall.hp
+                hostState: true,
+                leftBall: { x: playerBall.x, y: playerBall.y, hp: playerBall.hp, maxHp: playerBall.maxHp },
+                rightBall: { x: enemyBall.x, y: enemyBall.y, hp: enemyBall.hp, maxHp: enemyBall.maxHp },
+                matchScore
               });
             }
           }
@@ -1086,18 +1113,71 @@
         requestAnimationFrame(gameLoop);
       }
 
+      function showRoundResultOverlay(winnerSide) {
+        const iAmRight = currentMode === 'pvp' && pvpRole === 'right';
+        const iWon = (winnerSide === 'left' && !iAmRight) || (winnerSide === 'right' && iAmRight);
+        const leftName = document.getElementById('playerLabelName').textContent.replace(/^[🔴🔵]\s*/, '') || '왼쪽';
+        const rightName = currentMode === 'practice'
+          ? 'AI'
+          : (document.getElementById('enemyLabelName').textContent.replace(/^[🔴🔵]\s*/, '') || '오른쪽');
+        const winnerName = winnerSide === 'left' ? leftName : rightName;
+
+        if (currentMode === 'pvp') {
+          if (iWon) state.wins += 1;
+          else state.losses += 1;
+          saveState(true);
+        }
+        myReady = false;
+        opponentReady = false;
+        const readyBtn = document.getElementById('roundReadyBtn');
+        readyBtn.disabled = false;
+        readyBtn.textContent = '✅ 준비완료';
+        readyBtn.className = 'py-2.5 px-3 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow transition cursor-pointer';
+        document.getElementById('roundReadyStatus').textContent = currentMode === 'pvp'
+          ? '양쪽 모두 [준비완료]를 눌러야 재대결이 시작됩니다'
+          : '재대결하려면 [준비완료]를 누르세요';
+
+        const ro = document.getElementById('roundResultOverlay');
+        document.getElementById('roundResultTitle').textContent = (iWon ? '🏆 ' : '💥 ') + `${winnerName} 승리!`;
+        document.getElementById('roundResultTitle').className = 'text-xl sm:text-2xl font-black ' + (iWon ? 'text-amber-300' : 'text-rose-400');
+        document.getElementById('roundResultSub').textContent = `현재 스코어 ${matchScore.player} : ${matchScore.enemy}`;
+        ro.classList.remove('hidden');
+        ro.classList.add('flex');
+      }
+
+      function tryStartRematch() {
+        if (myReady && opponentReady) {
+          const ro = document.getElementById('roundResultOverlay');
+          ro.classList.add('hidden'); ro.classList.remove('flex');
+          roundSeq++;
+          resetRound();
+          showToast('⚔️ 양쪽 준비완료! 재대결 시작!');
+        }
+      }
+
       document.getElementById('roundReadyBtn').addEventListener('click', () => {
         const ro = document.getElementById('roundResultOverlay');
         if (currentMode === 'pvp' && pvpRoomName) {
+          myReady = true;
           const readyBtn = document.getElementById('roundReadyBtn');
           readyBtn.disabled = true;
           readyBtn.textContent = '⏳ 대기중...';
           readyBtn.className = 'py-2.5 px-3 rounded-xl text-xs font-black bg-slate-700 text-slate-300 cursor-not-allowed';
-          document.getElementById('roundReadyStatus').textContent = '상대방의 [준비완료]를 기다리는 중...';
-          socket.emit('pvp_round_ready', { room: pvpRoomName, role: pvpRole, skinId: state.equippedSkinId });
+          document.getElementById('roundReadyStatus').textContent = opponentReady
+            ? '양쪽 준비완료! 곧 시작됩니다...'
+            : '상대방의 [준비완료]를 기다리는 중...';
+          socket.emit('sync_game_state', {
+            room: pvpRoomName,
+            role: pvpRole,
+            readySync: true,
+            roundSeq
+          });
+          socket.emit('pvp_round_ready', { room: pvpRoomName, role: pvpRole });
           if (!socket.connected) {
             ro.classList.add('hidden'); ro.classList.remove('flex');
             resetRound();
+          } else {
+            tryStartRematch();
           }
         } else {
           ro.classList.add('hidden'); ro.classList.remove('flex');
@@ -1111,7 +1191,7 @@
         if (currentMode === 'pvp') {
           state.losses += 1;
           saveState(true);
-          if (pvpRoomName) socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole });
+          if (pvpRoomName) { socket.emit('sync_game_state', { room: pvpRoomName, role: pvpRole, forfeitSync: true }); socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole }); }
           showToast('🏳️ 기권하여 패배로 기록되었습니다.');
           returnBothToPvpLobby();
         } else {
@@ -1294,23 +1374,51 @@
         document.getElementById('pvpLobbySection').classList.remove('flex');
         document.getElementById('gameAreaSection').classList.remove('hidden');
 
-        document.getElementById('playerLabelName').textContent = pvpRole === 'left' ? `🔵 ${data.leftPlayer.username}` : `🔴 ${data.rightPlayer.username}`;
-        document.getElementById('enemyLabelName').textContent = pvpRole === 'left' ? `🔴 ${data.rightPlayer.username}` : `🔵 ${data.leftPlayer.username}`;
+        document.getElementById('playerLabelName').textContent = `🔵 ${data.leftPlayer.username}`;
+        document.getElementById('enemyLabelName').textContent = `🔴 ${data.rightPlayer.username}`;
 
         resetRound();
         showToast('⚔️ 실시간 1:1 대전 매치가 시작되었습니다!');
       });
 
       socket.on('update_game_state', (data) => {
-        if (data.room === pvpRoomName && data.role !== pvpRole) {
-          if (data.role === 'left') {
-            playerBall.x = canvasWidth - data.ball.x;
-            playerBall.y = data.ball.y;
-            playerBall.hp = data.hp;
-          } else {
-            enemyBall.x = data.ball.x;
-            enemyBall.y = data.ball.y;
-            enemyBall.hp = data.hp;
+        if (!data || data.room !== pvpRoomName || data.role === pvpRole) return;
+        if (data.readySync) {
+          opponentReady = true;
+          const st = document.getElementById('roundReadyStatus');
+          if (st && !myReady) st.textContent = '상대방 준비완료! [준비완료]를 눌러주세요';
+          tryStartRematch();
+          return;
+        }
+        if (data.forfeitSync) {
+          state.wins += 1;
+          saveState(true);
+          document.getElementById('roundResultOverlay').classList.add('hidden');
+          document.getElementById('roundResultOverlay').classList.remove('flex');
+          showToast('🏆 상대방이 포기/종료하여 승리로 기록되었습니다!');
+          returnBothToPvpLobby();
+          return;
+        }
+        if (data.hostState && pvpRole === 'right') {
+          if (data.leftBall) {
+            playerBall.x = data.leftBall.x;
+            playerBall.y = data.leftBall.y;
+            playerBall.hp = data.leftBall.hp;
+            playerBall.maxHp = data.leftBall.maxHp || 1000;
+          }
+          if (data.rightBall) {
+            enemyBall.x = data.rightBall.x;
+            enemyBall.y = data.rightBall.y;
+            enemyBall.hp = data.rightBall.hp;
+            enemyBall.maxHp = data.rightBall.maxHp || 1000;
+          }
+          if (data.matchScore) {
+            matchScore = data.matchScore;
+            document.getElementById('matchScoreText').textContent = `${matchScore.player} : ${matchScore.enemy}`;
+          }
+          if (data.roundOver && battleActive) {
+            battleActive = false;
+            showRoundResultOverlay(data.winnerSide);
           }
         }
       });
