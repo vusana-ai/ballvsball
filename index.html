@@ -6,8 +6,10 @@
   <meta name="theme-color" content="#0f172a" />
   <link rel="icon" type="image/png" href="./icon.png" />
   <link rel="manifest" href="./manifest.json" />
-  <title>공대공 — 바운스 배틀 아레나 & 대전모드</title>
+  <title>공대공 — 바운스 배틀 아레나 & 실시간 대전</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <!-- Socket.io 클라이언트 CDN -->
+  <script src="/socket.io/socket.io.js"></script>
   <!-- 토스페이먼츠 결제위젯 SDK v2 -->
   <script src="https://js.tosspayments.com/v2/standard"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -123,7 +125,7 @@
             ⚽ 연습 모드 (AI 스테이지)
           </button>
           <button id="modePvPTab" type="button" class="px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer">
-            ⚔️ 대전 모드 (대기실)
+            ⚔️ 대전 모드 (실시간 대기실)
           </button>
         </div>
         <div class="flex items-center gap-2 text-xs font-bold text-amber-300">
@@ -145,14 +147,14 @@
       </div>
     </section>
 
-    <!-- 대전 모드 대기실 섹션 (중복 참가 방지 적용) -->
+    <!-- 대전 모드 실시간 대기실 섹션 -->
     <section id="pvpLobbySection" class="hidden bg-slate-900/95 border-2 border-blue-500/50 rounded-2xl p-4 shadow-2xl flex flex-col gap-3.5">
       <div class="flex items-center justify-between border-b border-slate-800 pb-2">
         <div>
           <h2 class="text-sm sm:text-base font-extrabold text-blue-300 flex items-center gap-1.5">
-            <span>🛡️</span> <span>공대공 1:1 실시간 대기실</span>
+            <span>🛡️</span> <span>공대공 1:1 실시간 대기실 (멀티플레이)</span>
           </h2>
-          <p class="text-[11px] text-slate-400 mt-0.5">한 명의 유저는 한쪽 자리(왼쪽 또는 오른쪽)만 선택하여 들어갈 수 있습니다.</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">다른 유저들과 실시간으로 연결된 대기실입니다. 한쪽 자리를 선택하여 입장하세요!</p>
         </div>
         <div class="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/30" id="lobbyStatusBadge">
           대기 중 (0/2)
@@ -160,6 +162,7 @@
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <!-- 왼쪽 자리 -->
         <div id="slotLeft" class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 flex flex-col items-center justify-center gap-3 text-center">
           <div class="w-12 h-12 rounded-2xl bg-blue-600/20 border border-blue-500/40 flex items-center justify-center text-xl">🔵</div>
           <div>
@@ -171,6 +174,7 @@
           </button>
         </div>
 
+        <!-- 오른쪽 자리 -->
         <div id="slotRight" class="bg-slate-950/80 border border-slate-800 rounded-xl p-3.5 flex flex-col items-center justify-center gap-3 text-center">
           <div class="w-12 h-12 rounded-2xl bg-rose-600/20 border border-rose-500/40 flex items-center justify-center text-xl">🔴</div>
           <div>
@@ -192,13 +196,12 @@
       </div>
     </section>
 
-    <!-- 중간 게임 화면 (공 크기 확대, 공 중앙 HP 표시, 공 색상과 UI 박스 색상 일치) -->
+    <!-- 중간 게임 화면 -->
     <section class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
       <div id="canvasWrapper" class="relative w-full h-[380px] sm:h-[440px] cursor-pointer bg-slate-950">
         <canvas id="gameCanvas" class="block w-full h-full"></canvas>
 
         <div class="absolute top-3 inset-x-3 flex items-center justify-between pointer-events-none">
-          <!-- 아군 / 왼쪽 UI 박스 (색상 동기화) -->
           <div id="playerUiBox" class="bg-slate-900/90 border border-blue-500 px-3 py-1.5 rounded-xl backdrop-blur-sm flex flex-col gap-1 w-38 sm:w-50 transition-all duration-300">
             <div class="flex justify-between text-[11px] font-bold text-blue-300" id="playerLabelContainer">
               <span id="playerLabelName">🔵 아군 공</span>
@@ -209,7 +212,6 @@
             </div>
           </div>
 
-          <!-- 적 / 오른쪽 UI 박스 (색상 동기화) -->
           <div id="enemyUiBox" class="bg-slate-900/90 border border-rose-500 px-3 py-1.5 rounded-xl backdrop-blur-sm flex flex-col gap-1 w-38 sm:w-50 transition-all duration-300">
             <div class="flex justify-between text-[11px] font-bold text-rose-300" id="enemyLabelContainer">
               <span id="enemyLabelName">🔴 적 공 (AI)</span>
@@ -229,7 +231,7 @@
       </div>
     </section>
 
-    <!-- 액션 버튼 및 공 12개 납작한 칸 상점 섹션 (0G, 5000G, 10000G... 5천단위) -->
+    <!-- 액션 버튼 및 공 12개 납작한 칸 상점 섹션 -->
     <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl shadow-black/30 flex flex-col gap-3.5">
       <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
         <button id="launchActionBtn" type="button" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white font-black text-sm sm:text-base shadow-lg shadow-blue-500/25 transition flex items-center justify-center gap-2 cursor-pointer">
@@ -247,10 +249,8 @@
         </div>
       </div>
 
-      <!-- 공 12개 납작한 카드 그리드 -->
       <div id="skinsPanel" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
 
-      <!-- 랭킹 패널 -->
       <div id="rankingPanel" class="hidden flex-col gap-3">
         <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950/90 border border-slate-800 rounded-xl px-3.5 py-2.5">
           <div>
@@ -295,7 +295,7 @@
     </div>
   </div>
 
-  <!-- VIP 팝업 모달 -->
+  <!-- VIP 모달 -->
   <div id="vipModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
     <div class="bg-slate-900 border-2 border-purple-500/60 rounded-2xl max-w-lg w-full my-auto shadow-2xl shadow-purple-950/60 overflow-hidden">
       <div class="bg-gradient-to-r from-purple-950 via-indigo-950 to-slate-900 px-5 py-4 border-b border-purple-500/30 flex items-center justify-between">
@@ -367,7 +367,7 @@
     </div>
   </div>
 
-  <!-- 로그인/회원가입 모달 -->
+  <!-- 로그인 모달 -->
   <div id="authModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/80 backdrop-blur-sm p-4">
     <div class="bg-slate-900 border border-blue-500/40 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
       <div class="flex items-center justify-between mb-2">
@@ -385,7 +385,7 @@
         <button id="modeLoginBtn" type="button" class="flex-1 py-1.5 rounded-lg text-xs font-extrabold bg-blue-600 text-white transition">
           기존 계정 로그인
         </button>
-        <button id="modeRegisterBtn" type="button" class="flex-1 py-1.5 rounded-lg text-xs font-extrabold text-slate-400 hover:text-slate-200 transition">
+        <button id="modeRegisterBtn" type="button" class="flex-1 py-1.5 rounded-lg text-xs font-extrabold text-slate-400 transition">
           간편 회원가입
         </button>
       </div>
@@ -439,6 +439,9 @@
 
   <script>
     (() => {
+      // Socket.io 실시간 웹소켓 연결
+      const socket = io();
+
       // PWA 바로가기 설치 버튼 제어
       const installBtn = document.getElementById('androidInstallBtn');
       const installBtnText = document.getElementById('androidInstallBtnText');
@@ -505,13 +508,8 @@
       let hasUnsavedChanges = false;
       let currentMode = 'practice';
       let aiStageIndex = 0;
-
-      let pvpState = {
-        leftUser: null,
-        rightUser: null,
-        leftReady: false,
-        rightReady: false
-      };
+      let pvpRoomName = null;
+      let pvpRole = null; // 'left' 또는 'right'
 
       function isAdminAccount(username) {
         return username && ADMIN_VIP_PHONES.includes(username.trim());
@@ -638,7 +636,7 @@
         } catch (err) {}
       }
 
-      // 캔버스 및 게임 루프 (속도 감소: vx/vy 초기 속도 및 최대 속도 제한 낮춤, 공 크기 38, 중앙 큰 HP 숫자)
+      // 캔버스 및 게임 루프
       const canvas = document.getElementById('gameCanvas');
       const ctx = canvas.getContext('2d');
       const canvasWrapper = document.getElementById('canvasWrapper');
@@ -675,13 +673,14 @@
         enemyBall.vx = (Math.random() - 0.5) * 3 - 2.5;
         enemyBall.vy = (Math.random() - 0.5) * 3;
 
-        const currentAiSkin = SKINS[aiStageIndex % SKINS.length];
-        const enemyMax = 100 + aiStageIndex * 25;
-        enemyBall.maxHp = enemyMax;
-        enemyBall.hp = enemyMax;
-        document.getElementById('enemyLabelName').textContent = `🔴 적 공 (${currentAiSkin.name})`;
-        document.getElementById('aiStageDisplay').textContent = `Stage ${aiStageIndex + 1}: ${currentAiSkin.name}`;
-
+        if (currentMode === 'practice') {
+          const currentAiSkin = SKINS[aiStageIndex % SKINS.length];
+          const enemyMax = 100 + aiStageIndex * 25;
+          enemyBall.maxHp = enemyMax;
+          enemyBall.hp = enemyMax;
+          document.getElementById('enemyLabelName').textContent = `🔴 적 공 (${currentAiSkin.name})`;
+          document.getElementById('aiStageDisplay').textContent = `Stage ${aiStageIndex + 1}: ${currentAiSkin.name}`;
+        }
         battleActive = true;
       }
 
@@ -696,6 +695,7 @@
       }
 
       function getAiDamage() {
+        if (currentMode === 'pvp') return 12;
         const currentAiSkin = SKINS[aiStageIndex % SKINS.length];
         return Math.round(currentAiSkin.power * 0.7);
       }
@@ -711,7 +711,6 @@
           enemyBall.x += enemyBall.vx;
           enemyBall.y += enemyBall.vy;
 
-          // 속도 제한 (너무 빠르지 않게 부드러운 감속/상한 설정)
           const pSpeed = Math.sqrt(playerBall.vx * playerBall.vx + playerBall.vy * playerBall.vy);
           if (pSpeed > 6.5) { playerBall.vx = (playerBall.vx / pSpeed) * 6.5; playerBall.vy = (playerBall.vy / pSpeed) * 6.5; }
           const eSpeed = Math.sqrt(enemyBall.vx * enemyBall.vx + enemyBall.vy * enemyBall.vy);
@@ -743,11 +742,6 @@
               projectiles.push({ x: playerBall.x, y: playerBall.y, vx: 8, vy: (Math.random() - 0.5) * 3, radius: 8, color: '#4ade80', owner: 'player', type: 'venom' });
             } else if (skin.skill === 'holy') {
               playerBall.hp = Math.min(playerBall.maxHp, playerBall.hp + 12);
-            } else if (skin.skill === 'blackhole') {
-              enemyBall.vx += (playerBall.x - enemyBall.x) * 0.03;
-              enemyBall.vy += (playerBall.y - enemyBall.y) * 0.03;
-            } else if (skin.skill === 'cosmic') {
-              projectiles.push({ x: playerBall.x, y: playerBall.y, vx: 14, vy: 0, radius: 10, color: '#ec4899', owner: 'player', type: 'cosmic' });
             }
           }
 
@@ -825,10 +819,10 @@
               state.wins += 1;
               const reward = (250 + aiStageIndex * 120) * (state.isVip ? 5 : 1);
               state.gold += reward;
-              aiStageIndex = (aiStageIndex + 1) % SKINS.length;
+              if (currentMode === 'practice') aiStageIndex = (aiStageIndex + 1) % SKINS.length;
               saveState(true);
               updateUI();
-              showToast(`🎉 연습 배틀 승리! 다음 공 상대로 진급합니다! (+${reward} G)`);
+              showToast(`🎉 배틀 승리! (+${reward} G)`);
               setTimeout(resetRound, 1400);
             } else if (playerBall.hp <= 0) {
               battleActive = false;
@@ -838,6 +832,16 @@
               showToast(`💥 패배하였습니다... 다시 도전하세요.`);
               setTimeout(resetRound, 1400);
             }
+          }
+
+          // 멀티플레이 대전 모드일 경우 웹소켓으로 내 상태 동기화 송신
+          if (currentMode === 'pvp' && pvpRoomName) {
+            socket.emit('sync_game_state', {
+              room: pvpRoomName,
+              role: pvpRole,
+              ball: pvpRole === 'left' ? playerBall : enemyBall,
+              hp: pvpRole === 'left' ? playerBall.hp : enemyBall.hp
+            });
           }
         }
 
@@ -853,7 +857,6 @@
           ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvasWidth, y); ctx.stroke();
         }
 
-        // 파티클
         for (let i = particles.length - 1; i >= 0; i--) {
           const pt = particles[i];
           pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.life -= dt;
@@ -864,7 +867,6 @@
           ctx.globalAlpha = 1.0;
         }
 
-        // 투사체
         projectiles.forEach(pr => {
           ctx.fillStyle = pr.color;
           ctx.shadowColor = pr.color; ctx.shadowBlur = 12;
@@ -873,7 +875,7 @@
         });
 
         // ==========================================
-        // 아군 공 그리기 (큰 크기 38, 중앙에 큰 HP 숫자)
+        // 아군 공 (왼쪽) 그리기
         // ==========================================
         const skin = getEquippedSkin();
         ctx.save();
@@ -883,31 +885,6 @@
         ctx.beginPath(); ctx.arc(playerBall.x, playerBall.y, playerBall.radius, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; ctx.stroke();
 
-        if (skin.skill === 'shield') {
-          ctx.strokeStyle = 'rgba(192, 132, 252, 0.85)';
-          ctx.lineWidth = 4;
-          ctx.setLineDash([6, 4]);
-          ctx.beginPath(); ctx.arc(playerBall.x, playerBall.y, playerBall.radius + 10, 0, Math.PI * 2); ctx.stroke();
-          ctx.setLineDash([]);
-        } else if (skin.id === 'iron_ball') {
-          ctx.fillStyle = '#e2e8f0';
-          for (let a = 0; a < Math.PI * 2; a += Math.PI / 2) {
-            ctx.beginPath(); ctx.arc(playerBall.x + Math.cos(a) * 22, playerBall.y + Math.sin(a) * 22, 4.5, 0, Math.PI * 2); ctx.fill();
-          }
-        } else if (skin.id === 'inferno_ball') {
-          ctx.fillStyle = 'rgba(249, 115, 22, 0.55)';
-          ctx.beginPath(); ctx.arc(playerBall.x, playerBall.y, playerBall.radius + 8 + Math.sin(timestamp * 0.02) * 4, 0, Math.PI * 2); ctx.fill();
-        } else if (skin.id === 'thunder_ball') {
-          ctx.strokeStyle = '#fef08a';
-          ctx.lineWidth = 3;
-          ctx.beginPath(); ctx.arc(playerBall.x, playerBall.y, playerBall.radius + 10, timestamp * 0.01, timestamp * 0.01 + Math.PI); ctx.stroke();
-        } else if (skin.id === 'cosmic_ball') {
-          ctx.strokeStyle = '#f472b6';
-          ctx.lineWidth = 4;
-          ctx.beginPath(); ctx.arc(playerBall.x, playerBall.y, playerBall.radius + 12, 0, Math.PI * 2); ctx.stroke();
-        }
-
-        // 공 중앙에 커진 HP 숫자 표시 (폰트 크기 18px 굵게)
         ctx.fillStyle = '#ffffff';
         ctx.font = '900 18px Inter, "Noto Sans KR", sans-serif';
         ctx.textAlign = 'center';
@@ -916,13 +893,13 @@
         ctx.restore();
 
         // ==========================================
-        // 적 공 (AI) 그리기 (큰 크기 38, 중앙에 큰 HP 숫자)
+        // 적 공 (오른쪽) 그리기
         // ==========================================
-        const currentAiSkin = SKINS[aiStageIndex % SKINS.length];
+        const enemyColor = currentMode === 'pvp' ? '#f43f5e' : (SKINS[aiStageIndex % SKINS.length].color);
         ctx.save();
-        ctx.shadowColor = currentAiSkin.color;
+        ctx.shadowColor = enemyColor;
         ctx.shadowBlur = 20;
-        ctx.fillStyle = currentAiSkin.color;
+        ctx.fillStyle = enemyColor;
         ctx.beginPath(); ctx.arc(enemyBall.x, enemyBall.y, enemyBall.radius, 0, Math.PI * 2); ctx.fill();
         ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; ctx.stroke();
 
@@ -933,7 +910,6 @@
         ctx.fillText(Math.round(enemyBall.hp), enemyBall.x, enemyBall.y);
         ctx.restore();
 
-        // 상단 HP 바 반영
         document.getElementById('playerHpText').textContent = `${Math.round(playerBall.hp)} / ${playerBall.maxHp}`;
         document.getElementById('playerHpBar').style.width = `${Math.max(0, (playerBall.hp / playerBall.maxHp) * 100)}%`;
         document.getElementById('enemyHpText').textContent = `${Math.round(enemyBall.hp)} / ${enemyBall.maxHp}`;
@@ -945,7 +921,7 @@
       document.getElementById('launchActionBtn').addEventListener('click', () => {
         playerBall.vx += (Math.random() - 0.5) * 8 + 3;
         playerBall.vy += (Math.random() - 0.5) * 6;
-        showToast('⚡ 아군 공에 부스터 임펄스 주입!');
+        showToast('⚡ 공에 부스터 임펄스 주입!');
       });
 
       canvasWrapper.addEventListener('pointerdown', () => {
@@ -960,6 +936,100 @@
         }
       });
 
+      // ==========================================
+      // 🔌 Socket.io 웹소켓 실시간 이벤트 수신 핸들러
+      // ==========================================
+      socket.on('update_lobby', (players) => {
+        // players: [{ socketId, username, slot }]
+        const leftP = players.find(p => p.slot === 'left');
+        const rightP = players.find(p => p.slot === 'right');
+        const count = players.length;
+
+        document.getElementById('lobbyStatusBadge').textContent = `대기 중 (${count}/2)`;
+
+        const leftNameEl = document.getElementById('leftPlayerName');
+        const rightNameEl = document.getElementById('rightPlayerName');
+        const joinLeftBtn = document.getElementById('joinLeftBtn');
+        const joinRightBtn = document.getElementById('joinRightBtn');
+
+        if (leftP) {
+          leftNameEl.textContent = `${leftP.username} (참가중)`;
+          if (leftP.socketId === socket.id) {
+            joinLeftBtn.textContent = '참가 취소';
+            joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer';
+          } else {
+            joinLeftBtn.textContent = '다른 유저 선점됨';
+            joinLeftBtn.disabled = true;
+          }
+        } else {
+          leftNameEl.textContent = '빈 자리 (입장 대기중)';
+          joinLeftBtn.textContent = '왼쪽 자리 참가하기';
+          joinLeftBtn.disabled = false;
+          joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white shadow transition cursor-pointer';
+        }
+
+        if (rightP) {
+          rightNameEl.textContent = `${rightP.username} (참가중)`;
+          if (rightP.socketId === socket.id) {
+            joinRightBtn.textContent = '참가 취소';
+            joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer';
+          } else {
+            joinRightBtn.textContent = '다른 유저 선점됨';
+            joinRightBtn.disabled = true;
+          }
+        } else {
+          rightNameEl.textContent = '빈 자리 (입장 대기중)';
+          joinRightBtn.textContent = '오른쪽 자리 참가하기';
+          joinRightBtn.disabled = false;
+          joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow transition cursor-pointer';
+        }
+
+        const startBtn = document.getElementById('pvpStartMatchBtn');
+        if (count === 2) {
+          startBtn.disabled = false;
+          startBtn.className = 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition cursor-pointer animate-bounce';
+          document.getElementById('pvpNoticeText').textContent = '✨ 2명이 모두 입장했습니다! [대전 시작하기]를 누르세요.';
+        } else {
+          startBtn.disabled = true;
+          startBtn.className = 'px-5 py-2.5 rounded-xl bg-slate-800 text-slate-500 border border-slate-700 font-black text-xs sm:text-sm transition cursor-not-allowed';
+          document.getElementById('pvpNoticeText').textContent = '양쪽 참가자가 모두 입장해야 시작할 수 있습니다.';
+        }
+      });
+
+      socket.on('lobby_error', (msg) => {
+        showToast(msg);
+      });
+
+      socket.on('match_started', (data) => {
+        // data: { room, leftPlayer, rightPlayer }
+        pvpRoomName = data.room;
+        pvpRole = (data.leftPlayer.socketId === socket.id) ? 'left' : 'right';
+
+        document.getElementById('pvpLobbySection').classList.add('hidden');
+        document.getElementById('pvpLobbySection').classList.remove('flex');
+
+        document.getElementById('playerLabelName').textContent = pvpRole === 'left' ? `🔵 ${data.leftPlayer.username}` : `🔴 ${data.rightPlayer.username}`;
+        document.getElementById('enemyLabelName').textContent = pvpRole === 'left' ? `🔴 ${data.rightPlayer.username}` : `🔵 ${data.leftPlayer.username}`;
+
+        resetRound();
+        showToast('⚔️ 실시간 1:1 대전 매치가 시작되었습니다!');
+      });
+
+      socket.on('update_game_state', (data) => {
+        // 상대방의 공 위치 및 HP 동기화 수신
+        if (data.room === pvpRoomName && data.role !== pvpRole) {
+          if (data.role === 'left') {
+            playerBall.x = canvasWidth - data.ball.x; // 대칭 반전
+            playerBall.y = data.ball.y;
+            playerBall.hp = data.hp;
+          } else {
+            enemyBall.x = data.ball.x;
+            enemyBall.y = data.ball.y;
+            enemyBall.hp = data.hp;
+          }
+        }
+      });
+
       // 모드 탭 전환
       const modePracticeTab = document.getElementById('modePracticeTab');
       const modePvPTab = document.getElementById('modePvPTab');
@@ -968,6 +1038,8 @@
 
       modePracticeTab.addEventListener('click', () => {
         currentMode = 'practice';
+        pvpRoomName = null;
+        socket.emit('leave_pvp_lobby');
         modePracticeTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow transition cursor-pointer';
         modePvPTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer';
         practiceStatusBox.classList.remove('hidden');
@@ -981,138 +1053,53 @@
 
       modePvPTab.addEventListener('click', () => {
         currentMode = 'pvp';
-        modePvPTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow transition cursor-pointer';
         modePracticeTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer';
+        modePvPTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow transition cursor-pointer';
         practiceStatusBox.classList.add('hidden');
         practiceStatusBox.classList.remove('grid');
         pvpLobbySection.classList.remove('hidden');
         pvpLobbySection.classList.add('flex');
-        document.getElementById('playerLabelName').textContent = '🔵 왼쪽 플레이어';
-        document.getElementById('enemyLabelName').textContent = '🔴 오른쪽 플레이어';
-        updateLobbyUI();
-        showToast('⚔️ 대전 모드 대기실에 입장했습니다.');
+        showToast('⚔️ 실시간 대전 모드 대기실에 입장했습니다.');
       });
 
       const joinLeftBtn = document.getElementById('joinLeftBtn');
       const joinRightBtn = document.getElementById('joinRightBtn');
-      const leftPlayerName = document.getElementById('leftPlayerName');
-      const rightPlayerName = document.getElementById('rightPlayerName');
       const pvpStartMatchBtn = document.getElementById('pvpStartMatchBtn');
-      const lobbyStatusBadge = document.getElementById('lobbyStatusBadge');
 
       function getDisplayName() {
         if (currentUsername) {
           const parts = currentUsername.split('-');
-          const lastDigits = parts[parts.length - 1] || '5678';
-          return `번호뒷자리(${lastDigits})`;
+          return `번호(${parts[parts.length - 1] || '5678'})`;
         }
-        return '게스트1';
+        return '게스트_' + Math.floor(Math.random() * 900 + 100);
       }
 
-      // 대전모드: 중복 참가 방지 (한 유저는 왼쪽 또는 오른쪽 중 한곳만 들어갈 수 있음)
       joinLeftBtn.addEventListener('click', () => {
-        const name = getDisplayName();
-        if (pvpState.leftUser === name) {
-          // 이미 왼쪽에 참가중인 경우 취소
-          pvpState.leftUser = null;
-          updateLobbyUI();
-          showToast('🔵 왼쪽 자리 참가를 취소했습니다.');
-          return;
-        }
-        if (pvpState.rightUser === name) {
-          showToast('⚠️ 이미 오른쪽 자리에 참가 중입니다! 한 곳만 선택할 수 있습니다.');
-          return;
-        }
-        pvpState.leftUser = name;
-        updateLobbyUI();
-        showToast(`🔵 왼쪽 자리에 [${name}] 님 참가 완료!`);
+        const username = getDisplayName();
+        socket.emit('join_pvp_lobby', { username, slot: 'left' });
       });
 
       joinRightBtn.addEventListener('click', () => {
-        const name = currentUsername ? (currentUsername.split('-').pop() || '9999') + '(상대)' : '게스트2(AI)';
-        if (pvpState.rightUser === name) {
-          pvpState.rightUser = null;
-          updateLobbyUI();
-          showToast('🔴 오른쪽 자리 참가를 취소했습니다.');
-          return;
-        }
-        if (pvpState.leftUser === name) {
-          showToast('⚠️ 이미 왼쪽 자리에 참가 중입니다! 한 곳만 선택할 수 있습니다.');
-          return;
-        }
-        pvpState.rightUser = name;
-        updateLobbyUI();
-        showToast(`🔴 오른쪽 자리에 [${name}] 님 참가 완료!`);
+        const username = getDisplayName();
+        socket.emit('join_pvp_lobby', { username, slot: 'right' });
       });
-
-      function updateLobbyUI() {
-        let count = 0;
-        if (pvpState.leftUser) {
-          leftPlayerName.textContent = pvpState.leftUser + ' (참가완료)';
-          joinLeftBtn.textContent = '참가 취소';
-          joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer';
-          count++;
-        } else {
-          leftPlayerName.textContent = '빈 자리 (입장 대기중)';
-          joinLeftBtn.textContent = '왼쪽 자리 참가하기';
-          joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-blue-600 hover:bg-blue-500 text-white shadow transition cursor-pointer';
-        }
-
-        if (pvpState.rightUser) {
-          rightPlayerName.textContent = pvpState.rightUser + ' (참가완료)';
-          joinRightBtn.textContent = '참가 취소';
-          joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer';
-          count++;
-        } else {
-          rightPlayerName.textContent = '빈 자리 (입장 대기중)';
-          joinRightBtn.textContent = '오른쪽 자리 참가하기';
-          joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white shadow transition cursor-pointer';
-        }
-
-        lobbyStatusBadge.textContent = `대기 중 (${count}/2)`;
-
-        if (count === 2) {
-          pvpStartMatchBtn.disabled = false;
-          pvpStartMatchBtn.className = 'px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-lg transition cursor-pointer animate-bounce';
-          document.getElementById('pvpNoticeText').textContent = '✨ 2명이 모두 입장했습니다! [대전 시작하기]를 누르세요.';
-        } else {
-          pvpStartMatchBtn.disabled = true;
-          pvpStartMatchBtn.className = 'px-5 py-2.5 rounded-xl bg-slate-800 text-slate-500 border border-slate-700 font-black text-xs sm:text-sm transition cursor-not-allowed';
-          document.getElementById('pvpNoticeText').textContent = '양쪽 참가자가 모두 입장해야 시작할 수 있습니다.';
-        }
-      }
 
       pvpStartMatchBtn.addEventListener('click', () => {
-        pvpLobbySection.classList.add('hidden');
-        pvpLobbySection.classList.remove('flex');
-        resetRound();
-        showToast('⚔️ 1:1 대전 매치가 시작되었습니다!');
+        socket.emit('start_pvp_match');
       });
 
-      // 공 색상과 UI 박스 색상을 일치시키는 함수
+      // 색상 동기화 및 UI
       function updateUiBoxColors() {
         const skin = getEquippedSkin();
         const playerBox = document.getElementById('playerUiBox');
         const playerBar = document.getElementById('playerHpBar');
         const playerLabel = document.getElementById('playerLabelContainer');
 
-        // 플레이어 박스 색상을 장착한 공 색상(skin.color)으로 동기화
         playerBox.style.borderColor = skin.color;
         playerBar.style.backgroundColor = skin.color;
         playerLabel.style.color = skin.color;
-
-        // 적 공 색상 동기화
-        const currentAiSkin = SKINS[aiStageIndex % SKINS.length];
-        const enemyBox = document.getElementById('enemyUiBox');
-        const enemyBar = document.getElementById('enemyHpBar');
-        const enemyLabel = document.getElementById('enemyLabelContainer');
-
-        enemyBox.style.borderColor = currentAiSkin.color;
-        enemyBar.style.backgroundColor = currentAiSkin.color;
-        enemyLabel.style.color = currentAiSkin.color;
       }
 
-      // 로그인 상태에 따른 헤더 UI 업데이트
       function updateAuthHeaderUI() {
         const userBadge = document.getElementById('userBadge');
         const syncText = document.getElementById('syncStatusText');
@@ -1182,7 +1169,6 @@
         }, 2200);
       }
 
-      // 공 12종 납작한 카드 그리드 렌더링
       function renderSkinsPanel() {
         const panel = document.getElementById('skinsPanel');
         panel.innerHTML = '';
@@ -1242,7 +1228,6 @@
         });
       }
 
-      // 랭킹 조회
       async function fetchAndRenderRanking() {
         const listContainer = document.getElementById('rankingListContainer');
         const myRankDetail = document.getElementById('myRankDetailText');
@@ -1299,7 +1284,6 @@
 
       document.getElementById('refreshRankingBtn').addEventListener('click', fetchAndRenderRanking);
 
-      // VIP 모달 및 결제
       const vipModal = document.getElementById('vipModal');
       document.getElementById('vipOpenBtn').addEventListener('click', () => {
         vipModal.classList.remove('hidden'); vipModal.classList.add('flex');
@@ -1324,7 +1308,6 @@
         } catch (e) {}
       }
 
-      // 로그인 모달 및 인증 처리
       const authModal = document.getElementById('authModal');
       const phoneInput = document.getElementById('authPhoneDigits');
       const pinInput = document.getElementById('authPinCode');
