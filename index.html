@@ -209,12 +209,16 @@
       <div id="canvasWrapper" class="relative w-full h-[380px] sm:h-[440px] cursor-pointer bg-slate-950">
         <canvas id="gameCanvas" class="absolute inset-0 w-full h-full block"></canvas>
 
-        <!-- 라운드 승리/패배 중앙 결과 창 (클릭할 때까지 유지) -->
-        <div id="roundResultOverlay" class="absolute inset-0 z-20 hidden items-center justify-center bg-black/55 cursor-pointer">
-          <div class="bg-slate-900/95 border-2 border-blue-400/80 rounded-2xl px-7 py-5 text-center shadow-2xl">
-            <div id="roundResultTitle" class="text-xl sm:text-2xl font-black text-amber-300">🎉 승리!</div>
-            <div id="roundResultSub" class="text-xs font-bold text-slate-200 mt-1">현재 스코어 1 : 0 (3선승)</div>
-            <div class="text-[11px] text-sky-300 font-bold mt-3 animate-pulse">👆 클릭하면 다음 라운드가 시작됩니다</div>
+        <!-- 라운드 승리/패배 중앙 결과 창 (준비완료 / 포기 버튼) -->
+        <div id="roundResultOverlay" class="absolute inset-0 z-20 hidden items-center justify-center bg-black/60 backdrop-blur-[2px]">
+          <div class="bg-slate-900/95 border-2 border-blue-400/80 rounded-2xl px-7 py-5 text-center shadow-2xl max-w-xs w-[90%]">
+            <div id="roundResultTitle" class="text-xl sm:text-2xl font-black text-amber-300">🏆 승리!</div>
+            <div id="roundResultSub" class="text-xs font-bold text-slate-200 mt-1">현재 스코어 1 : 0</div>
+            <div id="roundReadyStatus" class="text-[11px] text-sky-300 font-bold mt-2.5">재대결하려면 [준비완료]를 누르세요</div>
+            <div class="grid grid-cols-2 gap-2.5 mt-3.5">
+              <button id="roundReadyBtn" type="button" class="py-2.5 px-3 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow transition cursor-pointer">✅ 준비완료</button>
+              <button id="roundForfeitBtn" type="button" class="py-2.5 px-3 rounded-xl text-xs font-black bg-rose-600 hover:bg-rose-500 text-white shadow transition cursor-pointer">🏳️ 포기</button>
+            </div>
           </div>
         </div>
 
@@ -942,6 +946,18 @@
                 ? `${getDisplayName()} 승리!`
                 : `${enemyDisplay} 승리!`;
 
+              if (currentMode === 'pvp') {
+                if (playerWonRound) state.wins += 1;
+                else state.losses += 1;
+                saveState(true);
+              }
+              const readyBtn = document.getElementById('roundReadyBtn');
+              readyBtn.disabled = false;
+              readyBtn.textContent = '✅ 준비완료';
+              readyBtn.className = 'py-2.5 px-3 rounded-xl text-xs font-black bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow transition cursor-pointer';
+              document.getElementById('roundReadyStatus').textContent = currentMode === 'pvp'
+                ? '양쪽 모두 [준비완료]를 눌러야 재대결이 시작됩니다'
+                : '재대결하려면 [준비완료]를 누르세요';
               const ro = document.getElementById('roundResultOverlay');
               document.getElementById('roundResultTitle').textContent = (playerWonRound ? '🏆 ' : '💥 ') + resultText;
               document.getElementById('roundResultTitle').className = 'text-xl sm:text-2xl font-black ' + (playerWonRound ? 'text-amber-300' : 'text-rose-400');
@@ -1059,11 +1075,74 @@
         requestAnimationFrame(gameLoop);
       }
 
-      document.getElementById('roundResultOverlay').addEventListener('click', () => {
+      document.getElementById('roundReadyBtn').addEventListener('click', () => {
         const ro = document.getElementById('roundResultOverlay');
-        ro.classList.add('hidden');
-        ro.classList.remove('flex');
+        if (currentMode === 'pvp' && pvpRoomName) {
+          const readyBtn = document.getElementById('roundReadyBtn');
+          readyBtn.disabled = true;
+          readyBtn.textContent = '⏳ 대기중...';
+          readyBtn.className = 'py-2.5 px-3 rounded-xl text-xs font-black bg-slate-700 text-slate-300 cursor-not-allowed';
+          document.getElementById('roundReadyStatus').textContent = '상대방의 [준비완료]를 기다리는 중...';
+          socket.emit('pvp_round_ready', { room: pvpRoomName, role: pvpRole, skinId: state.equippedSkinId });
+          if (!socket.connected) {
+            ro.classList.add('hidden'); ro.classList.remove('flex');
+            resetRound();
+          }
+        } else {
+          ro.classList.add('hidden'); ro.classList.remove('flex');
+          resetRound();
+        }
+      });
+
+      document.getElementById('roundForfeitBtn').addEventListener('click', () => {
+        const ro = document.getElementById('roundResultOverlay');
+        ro.classList.add('hidden'); ro.classList.remove('flex');
+        if (currentMode === 'pvp') {
+          state.losses += 1;
+          saveState(true);
+          if (pvpRoomName) socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole });
+          showToast('🏳️ 기권하여 패배로 기록되었습니다.');
+          returnBothToPvpLobby();
+        } else {
+          matchScore = { player: 0, enemy: 0 };
+          resetRound();
+          showToast('🏳️ 대결을 포기하고 새 라운드를 준비합니다.');
+        }
+      });
+
+      socket.on('pvp_both_ready', () => {
+        const ro = document.getElementById('roundResultOverlay');
+        ro.classList.add('hidden'); ro.classList.remove('flex');
         resetRound();
+        showToast('⚔️ 양쪽 준비완료! 재대결 시작!');
+      });
+
+      socket.on('pvp_opponent_forfeit', () => {
+        if (currentMode === 'pvp' && pvpRoomName) {
+          state.wins += 1;
+          saveState(true);
+          document.getElementById('roundResultOverlay').classList.add('hidden');
+          document.getElementById('roundResultOverlay').classList.remove('flex');
+          showToast('🏆 상대방이 포기/종료하여 승리로 기록되었습니다!');
+          returnBothToPvpLobby();
+        }
+      });
+
+      // 대전 중 그냥 게임(브라우저/탭) 종료 시 패배로 기록
+      window.addEventListener('beforeunload', () => {
+        if (currentMode === 'pvp' && pvpRoomName && battleActive) {
+          state.losses += 1;
+          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
+          socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole });
+          if (authToken) {
+            fetch(`${API_BASE_URL}/api/save`, {
+              method: 'POST',
+              keepalive: true,
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+              body: JSON.stringify({ gameId: GAME_ID, saveData: state, score: state.wins })
+            }).catch(() => {});
+          }
+        }
       });
 
       document.getElementById('matchResultBanner').addEventListener('click', () => {
@@ -1100,7 +1179,7 @@
           const lSkin = SKINS.find(sk => sk.id === leftP.skinId)?.name || '기본공';
           leftNameEl.textContent = `${leftP.username} (${lSkin}) · 참가 대기중`;
           if (leftP.socketId === socket.id) {
-            joinLeftBtn.textContent = '⏳ 참가 대기중';
+            joinLeftBtn.textContent = `⏳ 참가 대기중 (${lSkin})`;
             joinLeftBtn.disabled = false;
             joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
           } else {
@@ -1118,7 +1197,7 @@
           const rSkin = SKINS.find(sk => sk.id === rightP.skinId)?.name || '기본공';
           rightNameEl.textContent = `${rightP.username} (${rSkin}) · 참가 대기중`;
           if (rightP.socketId === socket.id) {
-            joinRightBtn.textContent = '⏳ 참가 대기중';
+            joinRightBtn.textContent = `⏳ 참가 대기중 (${rSkin})`;
             joinRightBtn.disabled = false;
             joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
           } else {
@@ -1209,6 +1288,12 @@
       const gameAreaSection = document.getElementById('gameAreaSection');
 
       modePracticeTab.addEventListener('click', () => {
+        if (currentMode === 'pvp' && pvpRoomName && battleActive) {
+          state.losses += 1;
+          saveState(true);
+          socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole });
+          showToast('🏳️ 대전 중 나가기 처리되어 패배로 기록되었습니다.');
+        }
         currentMode = 'practice';
         pvpRoomName = null;
         socket.emit('leave_pvp_lobby');
@@ -1263,7 +1348,7 @@
         const username = getDisplayName();
         const skin = getEquippedSkin();
         document.getElementById('leftPlayerName').textContent = `${username} (${skin.name}) · 참가 대기중`;
-        joinLeftBtn.textContent = '⏳ 참가 대기중';
+        joinLeftBtn.textContent = `⏳ 참가 대기중 (${skin.name})`;
         joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
         socket.emit('join_pvp_lobby', { username, slot: 'left', skinId: skin.id });
       });
@@ -1272,7 +1357,7 @@
         const username = getDisplayName();
         const skin = getEquippedSkin();
         document.getElementById('rightPlayerName').textContent = `${username} (${skin.name}) · 참가 대기중`;
-        joinRightBtn.textContent = '⏳ 참가 대기중';
+        joinRightBtn.textContent = `⏳ 참가 대기중 (${skin.name})`;
         joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
         socket.emit('join_pvp_lobby', { username, slot: 'right', skinId: skin.id });
       });
