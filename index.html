@@ -212,6 +212,26 @@
           ⚔️ 대전 시작하기
         </button>
       </div>
+
+      <!-- 대전모드 전용 승패 & 실시간 랭킹 -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800">
+        <div class="bg-slate-950/90 border border-amber-500/35 rounded-xl p-3 flex flex-col justify-center gap-1">
+          <div class="text-[11px] font-extrabold text-amber-300">📊 내 대전 전적 (대전모드)</div>
+          <div id="pvpMyRecordText" class="text-sm sm:text-base font-black text-slate-100 tabular-nums">0승 0패 (승률 0%)</div>
+          <div class="text-[10px] text-slate-400">대전모드 승패만 랭킹에 반영됩니다.</div>
+        </div>
+        <div class="sm:col-span-2 bg-slate-950/90 border border-slate-800 rounded-xl p-3">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-extrabold text-amber-300">🏆 대전모드 랭킹 TOP 10</span>
+            <button id="pvpRankingRefreshBtn" type="button" class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">
+              🔄 새로고침
+            </button>
+          </div>
+          <div id="pvpRankingList" class="flex flex-col gap-1 max-h-36 overflow-y-auto text-[11px]">
+            <div class="text-slate-500">랭킹 정보를 불러오는 중...</div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- 중간 게임 화면 (연습 모드 및 매치 진행 시 표시) -->
@@ -297,6 +317,15 @@
           <div id="practiceAiGrid" class="grid grid-cols-3 gap-1.5"></div>
         </div>
       </div>
+    </section>
+
+    <!-- 대전 모드 대결중 공 선택창 (게임화면 아래 배치) -->
+    <section id="pvpInGameSkinBox" class="hidden bg-slate-900/90 border border-indigo-500/40 rounded-2xl p-4 shadow-xl shadow-black/30 flex-col gap-2.5">
+      <div class="flex items-center justify-between text-[11px] flex-wrap gap-1">
+        <span class="font-extrabold text-indigo-300">⚔️ 대결중 내 공 변경 (실시간 적용)</span>
+        <span id="pvpInGameSkinStatus" class="font-extrabold text-amber-300">현재 공: 기본공</span>
+      </div>
+      <div id="pvpInGameSkinGrid" class="grid grid-cols-3 sm:grid-cols-6 gap-1.5"></div>
     </section>
 
     <!-- 바로가기 만들기 섹션 -->
@@ -593,6 +622,23 @@
       let practiceEnemySkinId = 'classic';
       let pvpRoomName = null;
       let pvpRole = null;
+      let pvpLeftSkinId = 'classic';
+      let pvpRightSkinId = 'classic';
+      let pvpLeftBaseName = '왼쪽';
+      let pvpRightBaseName = '오른쪽';
+      let pvpForfeitHandled = false;
+      let pvpLobbyReturnTimer = null;
+
+      function formatResultId(raw) {
+        if (!raw) return '';
+        let str = String(raw).replace(/^[🔴🔵]\s*/, '').trim();
+        const m = str.match(/(?:번호\((\d{4})\)|010-\d{4}-(\d{4}))/);
+        if (m) {
+          const last4 = m[1] || m[2];
+          str = str.replace(/번호\(\d{4}\)|010-\d{4}-\d{4}/, last4);
+        }
+        return str;
+      }
 
       function isAdminAccount(username) {
         return username && ADMIN_VIP_PHONES.includes(username.trim());
@@ -666,7 +712,8 @@
             hasUnsavedChanges = false;
             document.getElementById('syncStatusText').textContent = `클라우드 DB 저장 완료 (${data.savedAt})`;
             if (showNotification) showToast(`🟨 [${currentUsername}] 클라우드 서버에 전적이 안전하게 저장되었습니다!`);
-                      }
+            if (currentMode === 'pvp') loadPvpRanking();
+          }
         } catch (err) {}
       }
 
@@ -786,15 +833,28 @@
       function getEnemySkin() {
         return SKINS.find(s => s.id === practiceEnemySkinId) || SKINS[0];
       }
+      function getPvpLeftSkin() {
+        return SKINS.find(s => s.id === pvpLeftSkinId) || SKINS[0];
+      }
+      function getPvpRightSkin() {
+        return SKINS.find(s => s.id === pvpRightSkinId) || SKINS[0];
+      }
+      function getActiveLeftSkin() {
+        return currentMode === 'pvp' ? getPvpLeftSkin() : getEquippedSkin();
+      }
+      function getActiveRightSkin() {
+        return currentMode === 'pvp' ? getPvpRightSkin() : getEnemySkin();
+      }
 
       function getPlayerDamage() {
-        const skin = getEquippedSkin();
-        const vipMultiplier = state.isVip ? 3 : 1;
+        const skin = getActiveLeftSkin();
+        const vipMultiplier = (currentMode !== 'pvp' || pvpRole === 'left') && state.isVip ? 3 : 1;
         return Math.round(skin.power * vipMultiplier);
       }
 
       function getAiDamage() {
-        return 15;
+        const skin = getActiveRightSkin();
+        return skin ? skin.power : 15;
       }
 
       let lastTime = 0;
@@ -815,8 +875,8 @@
             const eSpeed = Math.sqrt(enemyBall.vx * enemyBall.vx + enemyBall.vy * enemyBall.vy);
             if (eSpeed > 6.5) { enemyBall.vx = (enemyBall.vx / eSpeed) * 6.5; enemyBall.vy = (enemyBall.vy / eSpeed) * 6.5; }
 
-            const skin = getEquippedSkin();
-            const aiSkin = currentMode === 'practice' ? getEnemySkin() : SKINS[0];
+            const skin = getActiveLeftSkin();
+            const aiSkin = getActiveRightSkin();
             let hitWall = false;
             if (playerBall.x - playerBall.radius < 0) { playerBall.x = playerBall.radius; playerBall.vx *= -1; hitWall = true; }
             if (playerBall.x + playerBall.radius > canvasWidth) { playerBall.x = canvasWidth - playerBall.radius; playerBall.vx *= -1; hitWall = true; }
@@ -1014,6 +1074,13 @@
             }
           }
 
+          const renderLeftSkin = getActiveLeftSkin();
+          const renderRightSkin = getActiveRightSkin();
+          if (battleActive && !isHost) {
+            if (renderLeftSkin.skill === 'dagger') playerBall.daggerAngle += dt * 4.8;
+            if (renderRightSkin.skill === 'dagger') enemyBall.daggerAngle += dt * 4.8;
+          }
+
           ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
           ctx.strokeStyle = 'rgba(51, 65, 85, 0.25)';
@@ -1053,8 +1120,8 @@
             ctx.restore();
           });
 
-          // 단검공 회전 단검 렌더링 (아군 & AI - 긴 단검)
-          [[getEquippedSkin().skill === 'dagger', playerBall], [currentMode === 'practice' && getEnemySkin().skill === 'dagger', enemyBall]].forEach(([on, ball]) => {
+          // 단검공 회전 단검 렌더링 (아군 & 상대 - 긴 단검)
+          [[renderLeftSkin.skill === 'dagger', playerBall], [renderRightSkin.skill === 'dagger', enemyBall]].forEach(([on, ball]) => {
             if (!on) return;
             const orbitR = ball.radius + 28;
             for (let k = 0; k < 3; k++) {
@@ -1078,7 +1145,7 @@
             ctx.shadowBlur = 0;
           });
 
-          const skin = getEquippedSkin();
+          const skin = renderLeftSkin;
           ctx.save();
           ctx.shadowColor = skin.color; ctx.shadowBlur = 20;
           ctx.fillStyle = skin.color;
@@ -1090,7 +1157,7 @@
           ctx.fillText(Math.round(playerBall.hp), playerBall.x, playerBall.y);
           ctx.restore();
 
-          const enemyColor = currentMode === 'pvp' ? '#f43f5e' : getEnemySkin().color;
+          const enemyColor = renderRightSkin.color;
           ctx.save();
           ctx.shadowColor = enemyColor; ctx.shadowBlur = 20;
           ctx.fillStyle = enemyColor;
@@ -1116,10 +1183,10 @@
       function showRoundResultOverlay(winnerSide) {
         const iAmRight = currentMode === 'pvp' && pvpRole === 'right';
         const iWon = (winnerSide === 'left' && !iAmRight) || (winnerSide === 'right' && iAmRight);
-        const leftName = document.getElementById('playerLabelName').textContent.replace(/^[🔴🔵]\s*/, '') || '왼쪽';
+        const leftName = formatResultId(document.getElementById('playerLabelName').textContent) || '왼쪽';
         const rightName = currentMode === 'practice'
           ? 'AI'
-          : (document.getElementById('enemyLabelName').textContent.replace(/^[🔴🔵]\s*/, '') || '오른쪽');
+          : (formatResultId(document.getElementById('enemyLabelName').textContent) || '오른쪽');
         const winnerName = winnerSide === 'left' ? leftName : rightName;
 
         if (currentMode === 'pvp') {
@@ -1208,15 +1275,26 @@
         showToast('⚔️ 양쪽 준비완료! 재대결 시작!');
       });
 
+      function handleOpponentForfeit() {
+        if (currentMode !== 'pvp' || !pvpRoomName || pvpForfeitHandled) return;
+        pvpForfeitHandled = true;
+        battleActive = false;
+        state.wins += 1;
+        saveState(true);
+        const ro = document.getElementById('roundResultOverlay');
+        ro.classList.add('hidden');
+        ro.classList.remove('flex');
+        document.getElementById('matchWinnerId').textContent = '🏳️ 상대방이 포기했습니다';
+        document.getElementById('matchResultLabel').textContent = '🏆 승리!';
+        document.getElementById('matchResultHint').textContent = '👆 화면을 클릭하면 대기실로 이동합니다';
+        const mb = document.getElementById('matchResultBanner');
+        mb.classList.remove('hidden');
+        mb.classList.add('flex');
+        showToast('🏳️ 상대방이 포기했습니다! 승리로 기록되었습니다.');
+      }
+
       socket.on('pvp_opponent_forfeit', () => {
-        if (currentMode === 'pvp' && pvpRoomName) {
-          state.wins += 1;
-          saveState(true);
-          document.getElementById('roundResultOverlay').classList.add('hidden');
-          document.getElementById('roundResultOverlay').classList.remove('flex');
-          showToast('🏆 상대방이 포기/종료하여 승리로 기록되었습니다!');
-          returnBothToPvpLobby();
-        }
+        handleOpponentForfeit();
       });
 
       // 대전 중 그냥 게임(브라우저/탭) 종료 시 패배로 기록
@@ -1340,26 +1418,51 @@
       socket.on('lobby_error', (msg) => { showToast(msg); });
 
       function returnBothToPvpLobby() {
+        if (pvpLobbyReturnTimer) {
+          clearTimeout(pvpLobbyReturnTimer);
+          pvpLobbyReturnTimer = null;
+        }
+        battleActive = false;
         pvpRoomName = null;
         pvpRole = null;
+        pvpForfeitHandled = false;
         matchScore = { player: 0, enemy: 0 };
+        document.getElementById('roundResultOverlay').classList.add('hidden');
+        document.getElementById('roundResultOverlay').classList.remove('flex');
+        document.getElementById('matchResultBanner').classList.add('hidden');
+        document.getElementById('matchResultBanner').classList.remove('flex');
+        document.getElementById('countdownOverlay').classList.add('hidden');
+        document.getElementById('countdownOverlay').classList.remove('flex');
         document.getElementById('gameAreaSection').classList.add('hidden');
+        document.getElementById('pvpInGameSkinBox').classList.add('hidden');
+        document.getElementById('pvpInGameSkinBox').classList.remove('flex');
         document.getElementById('pvpLobbySection').classList.remove('hidden');
         document.getElementById('pvpLobbySection').classList.add('flex');
+        lastLobbyPlayers = [];
+        renderLobbySlots([]);
         const myName = getDisplayName();
-        socket.emit('enter_pvp_lobby', { username: myName });
-        showToast('🛡️ 대전이 종료되어 대기실로 돌아왔습니다.');
+        if (!socket.connected) {
+          waitingPlayers = [{ username: myName, socketId: socket.id }];
+          renderWaitingList(waitingPlayers);
+        } else {
+          socket.emit('enter_pvp_lobby', { username: myName });
+        }
+        updateUI();
+        loadPvpRanking();
+        showToast('🛡️ 대전이 종료되어 대전모드 대기실로 이동했습니다.');
       }
 
       socket.on('pvp_match_finished', (data) => {
         if (currentMode === 'pvp' && pvpRoomName) {
-          document.getElementById('matchWinnerId').textContent = data?.winner || '승리자';
+          document.getElementById('matchWinnerId').textContent = formatResultId(data?.winner || '승리자');
+          document.getElementById('matchResultLabel').textContent = '🏆 승리!';
+          document.getElementById('matchResultHint').textContent = '👆 화면을 클릭하면 대기실로 이동합니다';
           document.getElementById('matchResultBanner').classList.remove('hidden');
           document.getElementById('matchResultBanner').classList.add('flex');
           battleActive = false;
-          setTimeout(() => {
-            document.getElementById('matchResultBanner').classList.add('hidden');
-            document.getElementById('matchResultBanner').classList.remove('flex');
+          if (pvpLobbyReturnTimer) clearTimeout(pvpLobbyReturnTimer);
+          pvpLobbyReturnTimer = setTimeout(() => {
+            pvpLobbyReturnTimer = null;
             returnBothToPvpLobby();
           }, 2600);
         }
@@ -1367,15 +1470,32 @@
 
       socket.on('match_started', (data) => {
         pvpRoomName = data.room;
+        pvpForfeitHandled = false;
         matchScore = { player: 0, enemy: 0 };
         pvpRole = (data.leftPlayer.socketId === socket.id) ? 'left' : 'right';
+
+        pvpLeftBaseName = (data.leftPlayer.username || '왼쪽').replace(/\s*\[.+\]$/, '');
+        pvpRightBaseName = (data.rightPlayer.username || '오른쪽').replace(/\s*\[.+\]$/, '');
+        pvpLeftSkinId = data.leftPlayer.skinId || (pvpRole === 'left' ? state.equippedSkinId : 'classic');
+        pvpRightSkinId = data.rightPlayer.skinId || (pvpRole === 'right' ? state.equippedSkinId : 'classic');
 
         document.getElementById('pvpLobbySection').classList.add('hidden');
         document.getElementById('pvpLobbySection').classList.remove('flex');
         document.getElementById('gameAreaSection').classList.remove('hidden');
+        document.getElementById('pvpInGameSkinBox').classList.remove('hidden');
+        document.getElementById('pvpInGameSkinBox').classList.add('flex');
 
-        document.getElementById('playerLabelName').textContent = `🔵 ${data.leftPlayer.username}`;
-        document.getElementById('enemyLabelName').textContent = `🔴 ${data.rightPlayer.username}`;
+        document.getElementById('playerLabelName').textContent = `🔵 ${pvpLeftBaseName} (${getPvpLeftSkin().name})`;
+        document.getElementById('enemyLabelName').textContent = `🔴 ${pvpRightBaseName} (${getPvpRightSkin().name})`;
+
+        updateUI();
+        socket.emit('sync_game_state', {
+          room: pvpRoomName,
+          role: pvpRole,
+          skinChange: true,
+          skinId: state.equippedSkinId,
+          username: getDisplayName()
+        });
 
         resetRound();
         showToast('⚔️ 실시간 1:1 대전 매치가 시작되었습니다!');
@@ -1383,6 +1503,25 @@
 
       socket.on('update_game_state', (data) => {
         if (!data || data.room !== pvpRoomName || data.role === pvpRole) return;
+        if (data.skinChange) {
+          const changedSkin = SKINS.find(s => s.id === data.skinId) || SKINS[0];
+          if (data.role === 'left') {
+            pvpLeftSkinId = changedSkin.id;
+            if (data.username) pvpLeftBaseName = data.username.replace(/\s*\[.+\]$/, '');
+            document.getElementById('playerLabelName').textContent = `🔵 ${pvpLeftBaseName} (${changedSkin.name})`;
+            playerBall.skillTimer = 0;
+            playerBall.daggerCd = 0;
+          } else if (data.role === 'right') {
+            pvpRightSkinId = changedSkin.id;
+            if (data.username) pvpRightBaseName = data.username.replace(/\s*\[.+\]$/, '');
+            document.getElementById('enemyLabelName').textContent = `🔴 ${pvpRightBaseName} (${changedSkin.name})`;
+            enemyBall.skillTimer = 0;
+            enemyBall.daggerCd = 0;
+          }
+          updateUiBoxColors();
+          showToast(`🔄 상대방이 공을 [${changedSkin.name}](으)로 변경했습니다!`);
+          return;
+        }
         if (data.readySync) {
           opponentReady = true;
           const st = document.getElementById('roundReadyStatus');
@@ -1391,12 +1530,7 @@
           return;
         }
         if (data.forfeitSync) {
-          state.wins += 1;
-          saveState(true);
-          document.getElementById('roundResultOverlay').classList.add('hidden');
-          document.getElementById('roundResultOverlay').classList.remove('flex');
-          showToast('🏆 상대방이 포기/종료하여 승리로 기록되었습니다!');
-          returnBothToPvpLobby();
+          handleOpponentForfeit();
           return;
         }
         if (data.hostState && pvpRole === 'right') {
@@ -1445,6 +1579,8 @@
         practiceStatusBox.classList.add('flex');
         pvpLobbySection.classList.add('hidden');
         pvpLobbySection.classList.remove('flex');
+        document.getElementById('pvpInGameSkinBox').classList.add('hidden');
+        document.getElementById('pvpInGameSkinBox').classList.remove('flex');
         gameAreaSection.classList.remove('hidden');
         document.getElementById('playerLabelName').textContent = `🔵 ${getDisplayName()} (${getEquippedSkin().name})`;
         resetRound();
@@ -1470,6 +1606,8 @@
         } else {
           socket.emit('enter_pvp_lobby', { username: myName });
         }
+        updateUI();
+        loadPvpRanking();
         showToast('⚔️ 실시간 대전 모드 대기실에 입장했습니다.');
       });
 
@@ -1527,14 +1665,28 @@
       });
 
       function updateUiBoxColors() {
-        const skin = getEquippedSkin();
+        const leftSkin = getActiveLeftSkin();
         const playerBox = document.getElementById('playerUiBox');
         const playerBar = document.getElementById('playerHpBar');
         const playerLabel = document.getElementById('playerLabelContainer');
 
-        playerBox.style.borderColor = skin.color;
-        playerBar.style.backgroundColor = skin.color;
-        playerLabel.style.color = skin.color;
+        playerBox.style.borderColor = leftSkin.color;
+        playerBar.style.backgroundColor = leftSkin.color;
+        playerLabel.style.color = leftSkin.color;
+
+        const enemyBox = document.getElementById('enemyUiBox');
+        const enemyBar = document.getElementById('enemyHpBar');
+        const enemyLabel = document.getElementById('enemyLabelContainer');
+        if (currentMode === 'pvp') {
+          const rightSkin = getPvpRightSkin();
+          enemyBox.style.borderColor = rightSkin.color;
+          enemyBar.style.backgroundColor = rightSkin.color;
+          enemyLabel.style.color = rightSkin.color;
+        } else {
+          enemyBox.style.borderColor = '';
+          enemyBar.style.backgroundColor = '';
+          enemyLabel.style.color = '';
+        }
       }
 
       function updateAuthHeaderUI() {
@@ -1578,6 +1730,10 @@
         const winRate = totalGames > 0 ? Math.round((state.wins / totalGames) * 100) : 0;
 
         document.getElementById('equippedSkinDisplay').textContent = skin.name;
+        const pvpRecordEl = document.getElementById('pvpMyRecordText');
+        if (pvpRecordEl) {
+          pvpRecordEl.textContent = `${state.wins}승 ${state.losses}패 (승률 ${winRate}%)`;
+        }
 
         const vipLabel = document.getElementById('vipHeaderBtnLabel');
         vipLabel.textContent = state.isVip ? 'VIP 적용중' : 'VIP';
@@ -1585,6 +1741,106 @@
         updateAuthHeaderUI();
         updateUiBoxColors();
         renderPracticeSelectors();
+        renderPvpInGameSkinSelector();
+      }
+
+      async function loadPvpRanking() {
+        const listEl = document.getElementById('pvpRankingList');
+        if (!listEl) return;
+        let rows = [];
+        try {
+          let res = await fetch(`${API_BASE_URL}/api/rankings?gameId=${GAME_ID}`);
+          if (res.status === 404) {
+            res = await fetch(`${API_BASE_URL}/api/ranking?gameId=${GAME_ID}`);
+          }
+          if (res.ok) {
+            const data = await res.json();
+            const rawList = Array.isArray(data) ? data : (data.rankings || data.ranking || []);
+            rows = rawList.map(item => {
+              const sd = item.saveData || item.save_data || {};
+              const w = typeof sd.wins === 'number' ? sd.wins : (typeof item.score === 'number' ? item.score : 0);
+              const l = typeof sd.losses === 'number' ? sd.losses : 0;
+              return { username: item.username || '유저', wins: w, losses: l };
+            });
+          }
+        } catch (e) {}
+
+        if (rows.length === 0) {
+          rows = [{ username: getDisplayName(), wins: state.wins, losses: state.losses, isLocal: true }];
+        }
+
+        rows.sort((a, b) => (b.wins - a.wins) || (a.losses - b.losses));
+        listEl.innerHTML = '';
+        rows.slice(0, 10).forEach((r, idx) => {
+          const total = r.wins + r.losses;
+          const rate = total > 0 ? Math.round((r.wins / total) * 100) : 0;
+          const isMe = currentUsername ? r.username === currentUsername : r.isLocal;
+          const rowDiv = document.createElement('div');
+          rowDiv.className = 'flex items-center justify-between px-2.5 py-1.5 rounded-lg border ' + (
+            isMe ? 'bg-blue-500/15 border-blue-500/40 text-blue-200 font-bold' : 'bg-slate-900/80 border-slate-800 text-slate-300'
+          );
+          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}위`;
+          const displayId = formatResultId(r.username) || r.username;
+          rowDiv.innerHTML = `
+            <span class="truncate">${medal} ${displayId}${isMe ? ' (나)' : ''}</span>
+            <span class="shrink-0 tabular-nums text-amber-300 font-extrabold">${r.wins}승 ${r.losses}패 (${rate}%)</span>
+          `;
+          listEl.appendChild(rowDiv);
+        });
+      }
+
+      const pvpRankingRefreshBtn = document.getElementById('pvpRankingRefreshBtn');
+      if (pvpRankingRefreshBtn) {
+        pvpRankingRefreshBtn.addEventListener('click', () => {
+          loadPvpRanking();
+          showToast('🔄 대전모드 랭킹을 새로고침했습니다.');
+        });
+      }
+
+      function renderPvpInGameSkinSelector() {
+        const grid = document.getElementById('pvpInGameSkinGrid');
+        const statusEl = document.getElementById('pvpInGameSkinStatus');
+        if (!grid || !statusEl) return;
+        const currentId = pvpRole === 'right' ? pvpRightSkinId : pvpRole === 'left' ? pvpLeftSkinId : state.equippedSkinId;
+        const currentSkin = SKINS.find(s => s.id === currentId) || SKINS[0];
+        statusEl.textContent = `현재 공: ${currentSkin.name}`;
+        grid.innerHTML = '';
+        SKINS.forEach(sk => {
+          const isSel = currentId === sk.id;
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'px-2 py-2 rounded-lg text-[11px] font-extrabold border transition cursor-pointer truncate ' + (
+            isSel ? 'bg-indigo-600 border-indigo-300 text-white shadow' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-indigo-400'
+          );
+          btn.textContent = sk.name;
+          btn.title = sk.desc;
+          btn.onclick = () => {
+            if (currentMode !== 'pvp' || !pvpRoomName) return;
+            state.equippedSkinId = sk.id;
+            saveState(true);
+            if (pvpRole === 'left') {
+              pvpLeftSkinId = sk.id;
+              playerBall.skillTimer = 0;
+              playerBall.daggerCd = 0;
+              document.getElementById('playerLabelName').textContent = `🔵 ${pvpLeftBaseName} (${sk.name})`;
+            } else if (pvpRole === 'right') {
+              pvpRightSkinId = sk.id;
+              enemyBall.skillTimer = 0;
+              enemyBall.daggerCd = 0;
+              document.getElementById('enemyLabelName').textContent = `🔴 ${pvpRightBaseName} (${sk.name})`;
+            }
+            socket.emit('sync_game_state', {
+              room: pvpRoomName,
+              role: pvpRole,
+              skinChange: true,
+              skinId: sk.id,
+              username: getDisplayName()
+            });
+            updateUI();
+            showToast(`⚽ 대결중 공을 [${sk.name}](으)로 변경했습니다!`);
+          };
+          grid.appendChild(btn);
+        });
       }
 
       function renderPracticeSelectors() {
