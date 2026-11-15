@@ -8,8 +8,16 @@
   <link rel="manifest" href="./manifest.json" />
   <title>공대공 — 바운스 배틀 아레나 & 대전모드</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <!-- Socket.io 클라이언트 -->
-  <script src="/socket.io/socket.io.js" onerror="window.noSocket=true;"></script>
+  <!-- Socket.io 클라이언트 (클라우드 서버 우선 연결) -->
+  <script>
+  (function(){
+    var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+    var sc = document.createElement('script');
+    sc.src = (isLocal ? '' : 'https://02826k.duckdns.org') + '/socket.io/socket.io.js';
+    sc.onerror = function(){ window.noSocket = true; };
+    document.head.appendChild(sc);
+  })();
+  </script>
   <!-- 토스페이먼츠 결제위젯 SDK v2 -->
   <script src="https://js.tosspayments.com/v2/standard"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -147,17 +155,31 @@
       </div>
     </section>
 
-    <!-- 대전 모드 실시간 대기실 섹션 (번호 뒷자리 또는 게스트 명시) -->
+    <!-- 대전 모드 실시간 대기실 섹션 (대기자 명단 + 좌우 참가석) -->
     <section id="pvpLobbySection" class="hidden bg-slate-900/95 border-2 border-blue-500/50 rounded-2xl p-4 shadow-2xl flex flex-col gap-3.5">
-      <div class="flex items-center justify-between border-b border-slate-800 pb-2">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-2 gap-2 flex-wrap">
         <div>
           <h2 class="text-sm sm:text-base font-extrabold text-blue-300 flex items-center gap-1.5">
             <span>🛡️</span> <span>공대공 1:1 실시간 대기실</span>
           </h2>
-          <p class="text-[11px] text-slate-400 mt-0.5">접속 중인 유저들이 좌우 참가석에 실시간으로 표시됩니다. (번호 뒷자리 또는 게스트)</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">접속 중인 유저들이 대기자 명단과 좌우 참가석에 실시간으로 표시됩니다. (번호 뒷자리 또는 게스트)</p>
         </div>
-        <div class="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/30" id="lobbyStatusBadge">
-          대기 중 (0/2)
+        <div class="flex items-center gap-1.5">
+          <span id="socketStatusBadge" class="text-[10px] font-bold px-2 py-1 rounded-lg bg-slate-800 text-slate-400 border border-slate-700">연결 확인중</span>
+          <div class="text-xs font-bold px-2.5 py-1 rounded-lg bg-blue-500/15 text-blue-300 border border-blue-500/30" id="lobbyStatusBadge">
+            대기 중 (0/2)
+          </div>
+        </div>
+      </div>
+
+      <!-- 실시간 대기자 명단 -->
+      <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-extrabold text-sky-300">👥 실시간 대기자 명단</span>
+          <span id="waitingCountText" class="text-[10px] text-slate-400 font-bold">0명 대기중</span>
+        </div>
+        <div id="waitingListBox" class="flex flex-wrap gap-1.5 text-[11px]">
+          <span class="text-slate-500">대기실에 입장하면 내 아이디가 표시됩니다.</span>
         </div>
       </div>
 
@@ -439,13 +461,61 @@
 
   <script>
     (() => {
-      // Socket.io 연결
-      let socket = { emit: () => {}, on: () => {} };
-      try {
-        if (typeof io !== 'undefined') {
-          socket = io();
+      // Socket.io 연결 (클라우드 서버 02826k.duckdns.org 연결)
+      let socket = { emit: () => {}, on: () => {}, connected: false, id: 'local' };
+      let myGuestName = null;
+      let waitingPlayers = [];
+
+      function renderWaitingList(list) {
+        const box = document.getElementById('waitingListBox');
+        const cnt = document.getElementById('waitingCountText');
+        if (!box || !cnt) return;
+        const arr = Array.isArray(list) ? list : [];
+        cnt.textContent = arr.length + '명 대기중';
+        if (arr.length === 0) {
+          box.innerHTML = '<span class="text-slate-500">현재 대기 중인 유저가 없습니다.</span>';
+          return;
         }
-      } catch (e) {}
+        box.innerHTML = '';
+        arr.forEach(p => {
+          const name = typeof p === 'string' ? p : (p.username || '게스트');
+          const isMe = (p.socketId && socket.id && p.socketId === socket.id) || name === getDisplayName();
+          const slotTag = p.slot === 'left' ? ' 🔵왼쪽' : p.slot === 'right' ? ' 🔴오른쪽' : ' ⏳대기';
+          const chip = document.createElement('span');
+          chip.className = 'px-2.5 py-1 rounded-lg border font-bold ' + (isMe ? 'bg-blue-500/20 border-blue-400 text-blue-200' : 'bg-slate-900 border-slate-700 text-slate-300');
+          chip.textContent = name + (isMe ? ' (나)' : '') + slotTag;
+          box.appendChild(chip);
+        });
+      }
+
+      function initSocketConnection() {
+        const badge = document.getElementById('socketStatusBadge');
+        try {
+          if (typeof io !== 'undefined') {
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            socket = isLocal ? io() : io('https://02826k.duckdns.org');
+            socket.on('connect', () => {
+              if (badge) {
+                badge.textContent = '🟢 실시간 연결됨';
+                badge.className = 'text-[10px] font-bold px-2 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 border border-emerald-500/40';
+              }
+              if (currentMode === 'pvp') {
+                socket.emit('enter_pvp_lobby', { username: getDisplayName() });
+              }
+            });
+            socket.on('disconnect', () => {
+              if (badge) {
+                badge.textContent = '🔴 연결 끊김';
+                badge.className = 'text-[10px] font-bold px-2 py-1 rounded-lg bg-rose-500/15 text-rose-300 border border-rose-500/40';
+              }
+            });
+          } else if (badge) {
+            badge.textContent = '⚠️ 오프라인 대기';
+          }
+        } catch (e) {
+          if (badge) badge.textContent = '⚠️ 연결 실패';
+        }
+      }
 
       // PWA 바로가기 설치 버튼 제어
       const installBtn = document.getElementById('androidInstallBtn');
@@ -520,7 +590,6 @@
         return username && ADMIN_VIP_PHONES.includes(username.trim());
       }
 
-      // 공 12종 정의
       const SKINS = [
         { id: 'classic', name: '기본 축구공', cost: 0, color: '#38bdf8', power: 10, skill: 'none', desc: '표준 회전형 축구공' },
         { id: 'iron_ball', name: '강철 메탈볼', cost: 5000, color: '#94a3b8', power: 16, skill: 'none', desc: '묵직한 무게와 강한 반발력' },
@@ -551,14 +620,10 @@
         const base = defaultState();
         if (!parsed || typeof parsed !== 'object') return base;
         const isVip = (typeof parsed.isVip === 'boolean' ? parsed.isVip : false) || isAdminAccount(currentUsername);
-        
         let ownedSkins = Array.isArray(parsed.ownedSkins) && parsed.ownedSkins.length > 0 ? [...parsed.ownedSkins] : [...base.ownedSkins];
         if (isVip) {
-          SKINS.forEach(s => {
-            if (!ownedSkins.includes(s.id)) ownedSkins.push(s.id);
-          });
+          SKINS.forEach(s => { if (!ownedSkins.includes(s.id)) ownedSkins.push(s.id); });
         }
-
         return {
           wins: typeof parsed.wins === 'number' && parsed.wins >= 0 ? Math.floor(parsed.wins) : base.wins,
           losses: typeof parsed.losses === 'number' && parsed.losses >= 0 ? Math.floor(parsed.losses) : base.losses,
@@ -583,13 +648,9 @@
       let state = loadLocalState();
 
       function saveState(syncImmediately = false) {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-        } catch (e) {}
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
         hasUnsavedChanges = true;
-        if (syncImmediately && authToken) {
-          syncSaveToServer(false);
-        }
+        if (syncImmediately && authToken) syncSaveToServer(false);
       }
 
       async function syncSaveToServer(showNotification = false) {
@@ -597,20 +658,10 @@
         try {
           const res = await fetch(`${API_BASE_URL}/api/save`, {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            },
-            body: JSON.stringify({
-              gameId: GAME_ID,
-              saveData: state,
-              score: state.wins
-            })
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+            body: JSON.stringify({ gameId: GAME_ID, saveData: state, score: state.wins })
           });
-          if (res.status === 401 || res.status === 403) {
-            handleLogout(true);
-            return;
-          }
+          if (res.status === 401 || res.status === 403) { handleLogout(true); return; }
           const data = await res.json();
           if (res.ok) {
             hasUnsavedChanges = false;
@@ -627,10 +678,7 @@
           const res = await fetch(`${API_BASE_URL}/api/load?gameId=${GAME_ID}`, {
             headers: { 'Authorization': `Bearer ${authToken}` }
           });
-          if (res.status === 401 || res.status === 403) {
-            handleLogout(true);
-            return;
-          }
+          if (res.status === 401 || res.status === 403) { handleLogout(true); return; }
           const data = await res.json();
           if (res.ok && data.saveData) {
             state = sanitizeState({ ...(data.saveData || {}), isVip: Boolean(data.isVip || data.saveData?.isVip) });
@@ -640,7 +688,6 @@
         } catch (err) {}
       }
 
-      // 캔버스 및 게임 루프
       const canvas = document.getElementById('gameCanvas');
       const ctx = canvas.getContext('2d');
       const canvasWrapper = document.getElementById('canvasWrapper');
@@ -875,35 +922,27 @@
             ctx.shadowBlur = 0;
           });
 
-          // 아군 공
           const skin = getEquippedSkin();
           ctx.save();
-          ctx.shadowColor = skin.color;
-          ctx.shadowBlur = 20;
+          ctx.shadowColor = skin.color; ctx.shadowBlur = 20;
           ctx.fillStyle = skin.color;
           ctx.beginPath(); ctx.arc(playerBall.x, playerBall.y, playerBall.radius, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; ctx.stroke();
-
           ctx.fillStyle = '#ffffff';
           ctx.font = '900 18px Inter, "Noto Sans KR", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText(Math.round(playerBall.hp), playerBall.x, playerBall.y);
           ctx.restore();
 
-          // 적 공
           const enemyColor = currentMode === 'pvp' ? '#f43f5e' : (SKINS[aiStageIndex % SKINS.length].color);
           ctx.save();
-          ctx.shadowColor = enemyColor;
-          ctx.shadowBlur = 20;
+          ctx.shadowColor = enemyColor; ctx.shadowBlur = 20;
           ctx.fillStyle = enemyColor;
           ctx.beginPath(); ctx.arc(enemyBall.x, enemyBall.y, enemyBall.radius, 0, Math.PI * 2); ctx.fill();
           ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3.5; ctx.stroke();
-
           ctx.fillStyle = '#ffffff';
           ctx.font = '900 18px Inter, "Noto Sans KR", sans-serif';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText(Math.round(enemyBall.hp), enemyBall.x, enemyBall.y);
           ctx.restore();
 
@@ -936,8 +975,16 @@
         }
       });
 
+      initSocketConnection();
+
       // Socket.io 이벤트 수신
+      socket.on('update_waiting_list', (list) => {
+        waitingPlayers = Array.isArray(list) ? list : [];
+        renderWaitingList(waitingPlayers);
+      });
+
       socket.on('update_lobby', (players) => {
+        renderWaitingList(players);
         const leftP = players.find(p => p.slot === 'left');
         const rightP = players.find(p => p.slot === 'right');
         const count = players.length;
@@ -953,6 +1000,7 @@
           leftNameEl.textContent = `${leftP.username} (참가중)`;
           if (leftP.socketId === socket.id) {
             joinLeftBtn.textContent = '참가 취소';
+            joinLeftBtn.disabled = false;
             joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer';
           } else {
             joinLeftBtn.textContent = '다른 유저 선점됨';
@@ -969,6 +1017,7 @@
           rightNameEl.textContent = `${rightP.username} (참가중)`;
           if (rightP.socketId === socket.id) {
             joinRightBtn.textContent = '참가 취소';
+            joinRightBtn.disabled = false;
             joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer';
           } else {
             joinRightBtn.textContent = '다른 유저 선점됨';
@@ -1024,7 +1073,6 @@
         }
       });
 
-      // 모드 탭 전환 (연습모드 vs 대전모드 대기실 화면 전환 분기)
       const modePracticeTab = document.getElementById('modePracticeTab');
       const modePvPTab = document.getElementById('modePvPTab');
       const practiceStatusBox = document.getElementById('practiceStatusBox');
@@ -1055,7 +1103,14 @@
         practiceStatusBox.classList.remove('grid');
         pvpLobbySection.classList.remove('hidden');
         pvpLobbySection.classList.add('flex');
-        gameAreaSection.classList.add('hidden'); // 대전모드 대기실에서는 게임화면 숨김 (시작 시 노출)
+        gameAreaSection.classList.add('hidden');
+
+        const myName = getDisplayName();
+        if (!waitingPlayers.some(p => (typeof p === 'string' ? p : p.username) === myName)) {
+          waitingPlayers = [{ username: myName, socketId: socket.id }, ...waitingPlayers];
+        }
+        renderWaitingList(waitingPlayers);
+        socket.emit('enter_pvp_lobby', { username: myName });
         showToast('⚔️ 실시간 대전 모드 대기실에 입장했습니다.');
       });
 
@@ -1068,7 +1123,8 @@
           const parts = currentUsername.split('-');
           return `번호(${parts[parts.length - 1] || '5678'})`;
         }
-        return '게스트_' + Math.floor(Math.random() * 900 + 100);
+        if (!myGuestName) myGuestName = '게스트_' + Math.floor(Math.random() * 900 + 100);
+        return myGuestName;
       }
 
       joinLeftBtn.addEventListener('click', () => {
@@ -1198,15 +1254,10 @@
 
           card.querySelector('button').addEventListener('click', () => {
             if (equipped) return;
-            if (isVipOnly && !state.isVip) {
-              openVipModal();
-              return;
-            }
+            if (isVipOnly && !state.isVip) { openVipModal(); return; }
             if (owned || (isVipOnly && state.isVip)) {
               state.equippedSkinId = s.id;
-              saveState(true);
-              updateUI();
-              updateUiBoxColors();
+              saveState(true); updateUI(); updateUiBoxColors();
               showToast(`⚽ [${s.name}] 공 장착 완료!`);
               return;
             }
@@ -1214,9 +1265,7 @@
               state.gold -= s.cost;
               state.ownedSkins.push(s.id);
               state.equippedSkinId = s.id;
-              saveState(true);
-              updateUI();
-              updateUiBoxColors();
+              saveState(true); updateUI(); updateUiBoxColors();
               showToast(`🎉 [${s.name}] 공 구매 및 장착 완료!`);
             } else {
               showToast('골드가 부족합니다!');
@@ -1283,10 +1332,11 @@
       document.getElementById('refreshRankingBtn').addEventListener('click', fetchAndRenderRanking);
 
       const vipModal = document.getElementById('vipModal');
-      document.getElementById('vipOpenBtn').addEventListener('click', () => {
+      function openVipModal() {
         vipModal.classList.remove('hidden'); vipModal.classList.add('flex');
         initTossPaymentWidget();
-      });
+      }
+      document.getElementById('vipOpenBtn').addEventListener('click', openVipModal);
       document.getElementById('vipCloseBtn').addEventListener('click', () => {
         vipModal.classList.add('hidden'); vipModal.classList.remove('flex');
       });
@@ -1324,13 +1374,22 @@
         authModal.classList.add('hidden'); authModal.classList.remove('flex');
       });
 
+      document.getElementById('modeLoginBtn').addEventListener('click', () => {
+        isRegisterMode = false;
+        document.getElementById('modeLoginBtn').className = 'flex-1 py-1.5 rounded-lg text-xs font-extrabold bg-blue-600 text-white transition';
+        document.getElementById('modeRegisterBtn').className = 'flex-1 py-1.5 rounded-lg text-xs font-extrabold text-slate-400 transition';
+        document.getElementById('authSubmitBtn').textContent = '로그인 및 서버저장 연동';
+      });
+      document.getElementById('modeRegisterBtn').addEventListener('click', () => {
+        isRegisterMode = true;
+        document.getElementById('modeRegisterBtn').className = 'flex-1 py-1.5 rounded-lg text-xs font-extrabold bg-blue-600 text-white transition';
+        document.getElementById('modeLoginBtn').className = 'flex-1 py-1.5 rounded-lg text-xs font-extrabold text-slate-400 transition';
+        document.getElementById('authSubmitBtn').textContent = '가입하고 현재 데이터 서버저장';
+      });
+
       phoneInput.addEventListener('input', (e) => {
         const digits = e.target.value.replace(/\D/g, '').slice(0, 8);
-        if (digits.length > 4) {
-          e.target.value = `${digits.slice(0, 4)}-${digits.slice(4)}`;
-        } else {
-          e.target.value = digits;
-        }
+        e.target.value = digits.length > 4 ? `${digits.slice(0, 4)}-${digits.slice(4)}` : digits;
       });
 
       pinInput.addEventListener('input', (e) => {
@@ -1361,21 +1420,25 @@
           localStorage.setItem(TOKEN_KEY, authToken);
           localStorage.setItem(USER_KEY, currentUsername);
 
-          if (data.isVip || data.saveData?.isVip || isAdminAccount(fullPhoneId)) {
+          if (!isRegisterMode && data.saveData) {
+            state = sanitizeState({ ...(data.saveData || {}), isVip: Boolean(data.isVip || data.saveData?.isVip) });
+          } else if (data.isVip || data.saveData?.isVip || isAdminAccount(fullPhoneId)) {
             state.isVip = true;
+            state = sanitizeState(state);
           }
-          state = sanitizeState(state);
           saveState(true);
 
           authModal.classList.add('hidden'); authModal.classList.remove('flex');
           updateUI();
+          if (currentMode === 'pvp') {
+            renderWaitingList([{ username: getDisplayName(), socketId: socket.id }]);
+            socket.emit('enter_pvp_lobby', { username: getDisplayName() });
+          }
           showToast(`🟨 [${currentUsername}] 로그인 완료!`);
         } catch (err) {}
       });
 
-      document.getElementById('logoutBtn').addEventListener('click', () => {
-        handleLogout(false);
-      });
+      document.getElementById('logoutBtn').addEventListener('click', () => { handleLogout(false); });
 
       const resetModal = document.getElementById('resetModal');
       document.getElementById('resetOpenBtn').addEventListener('click', () => {
