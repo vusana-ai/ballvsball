@@ -72,11 +72,6 @@
         </div>
 
         <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          <div class="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-500/15 border border-amber-500/40 text-amber-300 flex items-center gap-1 shadow-sm">
-            <span>🪙</span>
-            <span id="goldDisplay">0</span>
-            <span>G</span>
-          </div>
 
           <button id="serverSaveGoldBtn" type="button" title="클릭하여 서버 로그인 및 데이터 영구 저장"
             class="group px-2.5 sm:px-3 py-1 rounded-xl text-xs font-black bg-gradient-to-b from-amber-300 via-amber-400 to-amber-600 hover:from-yellow-200 hover:via-amber-300 hover:to-amber-500 text-slate-950 border border-yellow-200/80 shadow-md shadow-amber-500/25 transition active:scale-95 flex items-center gap-1.5 cursor-pointer">
@@ -108,7 +103,7 @@
             🔊 효과음 ON
           </button>
           <button id="resetOpenBtn" type="button" class="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-slate-800 hover:bg-rose-950/70 hover:text-rose-300 border border-slate-700 hover:border-rose-700/60 text-slate-300 transition active:scale-95 cursor-pointer">
-            초기화
+            라운드 초기화
           </button>
         </div>
       </div>
@@ -134,17 +129,7 @@
         </div>
       </div>
 
-      <!-- 연습 모드 상태바 -->
-      <div id="practiceStatusBox" class="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-slate-800">
-        <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl px-3 py-2 flex flex-col justify-center">
-          <div class="text-[11px] text-slate-400 font-medium">연습 전적</div>
-          <div class="text-xs sm:text-sm font-bold text-sky-300 mt-0.5" id="scoreDisplay">승리: 0승 0패</div>
-        </div>
-        <div class="bg-slate-950/80 border border-slate-800/90 rounded-xl px-3 py-2 flex flex-col justify-center">
-          <div class="text-[11px] text-slate-400 font-medium">현재 AI 상대 공 스테이지</div>
-          <div class="text-xs sm:text-sm font-extrabold text-amber-400 mt-0.5" id="aiStageDisplay">Stage 1: 기본 축구공</div>
-        </div>
-      </div>
+
     </section>
 
     <!-- 대전 모드 실시간 대기실 섹션 (대기자 명단 + 좌우 참가석) -->
@@ -201,8 +186,17 @@
         </div>
       </div>
 
+      <!-- 대전 모드 공 선택 UI (참가 전 선택) -->
+      <div class="bg-slate-950/90 border border-indigo-500/40 rounded-xl p-3">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[11px] font-black text-indigo-300">⚽ 대전 참가 전 내 공 선택</span>
+          <span id="pvpSelectedSkinLabel" class="text-[11px] font-bold text-amber-300">선택: 기본공</span>
+        </div>
+        <div id="pvpSkinSelectGrid" class="grid grid-cols-3 sm:grid-cols-6 gap-1.5"></div>
+      </div>
+
       <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-        <div class="text-[11px] text-slate-400" id="pvpNoticeText">양쪽 참가자가 모두 입장해야 시작할 수 있습니다.</div>
+        <div class="text-[11px] text-slate-400" id="pvpNoticeText">공을 선택한 뒤 왼쪽/오른쪽 자리에 참가하세요.</div>
         <button id="pvpStartMatchBtn" type="button" disabled
           class="px-5 py-2.5 rounded-xl bg-slate-800 text-slate-500 border border-slate-700 font-black text-xs sm:text-sm transition cursor-not-allowed">
           ⚔️ 대전 시작하기
@@ -215,37 +209,46 @@
       <div id="canvasWrapper" class="relative w-full h-[380px] sm:h-[440px] cursor-pointer bg-slate-950">
         <canvas id="gameCanvas" class="absolute inset-0 w-full h-full block"></canvas>
 
-        <!-- 중앙 10선승 스코어보드 -->
-        <div id="matchScoreBadge" class="pointer-events-none absolute top-3 left-1/2 -translate-x-1/2 z-10 px-3 py-1 rounded-xl bg-slate-950/90 border border-amber-400/50 text-xs font-black text-amber-300 shadow-lg tabular-nums">
-          <span id="matchScoreText">0 : 0 (10선승)</span>
-        </div>
-
-        <!-- 10승 최종 승리 배너 -->
-        <div id="matchResultBanner" class="pointer-events-none absolute inset-0 z-20 hidden items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div class="bg-slate-900/95 border-2 border-amber-400 rounded-2xl px-8 py-6 text-center shadow-2xl">
-            <div id="matchWinnerId" class="text-lg sm:text-2xl font-black text-amber-300">번호(1234)</div>
-            <div class="text-2xl sm:text-4xl font-black text-white mt-1">🏆 승리!</div>
-            <div class="text-xs text-slate-300 mt-2">잠시 후 대전 모드 대기실로 돌아갑니다...</div>
+        <!-- 라운드 승리/패배 중앙 결과 창 (클릭할 때까지 유지) -->
+        <div id="roundResultOverlay" class="absolute inset-0 z-20 hidden items-center justify-center bg-black/55 cursor-pointer">
+          <div class="bg-slate-900/95 border-2 border-blue-400/80 rounded-2xl px-7 py-5 text-center shadow-2xl">
+            <div id="roundResultTitle" class="text-xl sm:text-2xl font-black text-amber-300">🎉 승리!</div>
+            <div id="roundResultSub" class="text-xs font-bold text-slate-200 mt-1">현재 스코어 1 : 0 (3선승)</div>
+            <div class="text-[11px] text-sky-300 font-bold mt-3 animate-pulse">👆 클릭하면 다음 라운드가 시작됩니다</div>
           </div>
         </div>
 
-        <div class="absolute top-3 inset-x-3 flex items-center justify-between pointer-events-none z-10">
-          <div id="playerUiBox" class="bg-slate-900/90 border border-blue-500 px-3 py-1.5 rounded-xl backdrop-blur-sm flex flex-col gap-1 w-38 sm:w-50 transition-all duration-300">
-            <div class="flex justify-between text-[11px] font-bold text-blue-300" id="playerLabelContainer">
-              <span id="playerLabelName">🔵 아군 공</span>
-              <span id="playerHpText">100 / 100</span>
+        <!-- 3승 최종 승리 배너 (클릭할 때까지 유지) -->
+        <div id="matchResultBanner" class="absolute inset-0 z-20 hidden items-center justify-center bg-black/75 backdrop-blur-sm cursor-pointer">
+          <div class="bg-slate-900/95 border-2 border-amber-400 rounded-2xl px-8 py-6 text-center shadow-2xl">
+            <div id="matchWinnerId" class="text-lg sm:text-2xl font-black text-amber-300">번호(1234)</div>
+            <div id="matchResultLabel" class="text-2xl sm:text-4xl font-black text-white mt-1">🏆 승리!</div>
+            <div id="matchResultHint" class="text-xs text-sky-300 font-bold mt-3 animate-pulse">👆 화면을 클릭하여 계속하기</div>
+          </div>
+        </div>
+
+        <!-- 상단 풀와이드 에너지바 + 중앙 스코어판 -->
+        <div class="absolute top-3 inset-x-3 flex items-center gap-2 pointer-events-none z-10">
+          <div id="playerUiBox" class="flex-1 min-w-0 bg-slate-900/90 border border-blue-500 px-2.5 sm:px-3 py-1.5 rounded-xl backdrop-blur-sm flex flex-col gap-1 transition-all duration-300">
+            <div class="flex justify-between text-[10px] sm:text-[11px] font-bold text-blue-300 gap-1" id="playerLabelContainer">
+              <span id="playerLabelName" class="truncate">🔵 아군 공</span>
+              <span id="playerHpText" class="shrink-0 tabular-nums">100 / 100</span>
             </div>
-            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
               <div id="playerHpBar" class="h-full bg-blue-500 transition-all duration-75" style="width: 100%;"></div>
             </div>
           </div>
 
-          <div id="enemyUiBox" class="bg-slate-900/90 border border-rose-500 px-3 py-1.5 rounded-xl backdrop-blur-sm flex flex-col gap-1 w-38 sm:w-50 transition-all duration-300">
-            <div class="flex justify-between text-[11px] font-bold text-rose-300" id="enemyLabelContainer">
-              <span id="enemyLabelName">🔴 적 공 (AI)</span>
-              <span id="enemyHpText">100 / 100</span>
+          <div id="matchScoreBadge" class="shrink-0 px-2.5 sm:px-3 py-2 rounded-xl bg-slate-950/95 border border-amber-400/60 text-[11px] sm:text-xs font-black text-amber-300 shadow-lg tabular-nums">
+            <span id="matchScoreText">0 : 0</span>
+          </div>
+
+          <div id="enemyUiBox" class="flex-1 min-w-0 bg-slate-900/90 border border-rose-500 px-2.5 sm:px-3 py-1.5 rounded-xl backdrop-blur-sm flex flex-col gap-1 transition-all duration-300">
+            <div class="flex justify-between text-[10px] sm:text-[11px] font-bold text-rose-300 gap-1" id="enemyLabelContainer">
+              <span id="enemyLabelName" class="truncate">🔴 적 공 (AI)</span>
+              <span id="enemyHpText" class="shrink-0 tabular-nums">100 / 100</span>
             </div>
-            <div class="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+            <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
               <div id="enemyHpBar" class="h-full bg-rose-500 transition-all duration-75" style="width: 100%;"></div>
             </div>
           </div>
@@ -253,49 +256,27 @@
 
         <div class="pointer-events-none absolute bottom-3 inset-x-0 flex justify-center px-3 z-10">
           <div class="px-3.5 py-1.5 rounded-full bg-slate-950/80 border border-slate-700/80 backdrop-blur-sm text-[11px] sm:text-xs text-slate-200 font-medium shadow">
-            화면을 클릭하거나 <kbd class="px-1.5 py-0.5 bg-slate-800 rounded text-amber-300 font-mono text-[10px]">Space</kbd> 를 눌러 공에 부스터 임펄스를 주어 공격하세요!
+            양쪽 공이 자동으로 충돌하며 고유 스킬로 대결합니다!
           </div>
         </div>
       </div>
     </section>
 
-    <!-- 액션 버튼 및 공 12개 납작한 칸 상점 섹션 -->
-    <section class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl shadow-black/30 flex flex-col gap-3.5">
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
-        <button id="launchActionBtn" type="button" class="flex-1 py-3 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 hover:from-blue-500 hover:to-indigo-500 active:scale-[0.99] text-white font-black text-sm sm:text-base shadow-lg shadow-blue-500/25 transition flex items-center justify-center gap-2 cursor-pointer">
-          <span>⚡</span>
-          <span>부스터 발사! (임펄스 충돌)</span>
-        </button>
-
-        <div class="flex rounded-xl bg-slate-950 p-1 border border-slate-800 shrink-0">
-          <button id="tabSkinsBtn" type="button" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-extrabold bg-slate-800 text-blue-300 shadow transition">
-            ⚽ 공 6종 스킨상점
-          </button>
-          <button id="tabRankingBtn" type="button" class="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-extrabold text-slate-400 hover:text-slate-200 transition">
-            🏆 전적 랭킹
-          </button>
-        </div>
+    <!-- 연습 모드 공 선택창 (게임화면 아래 배치) -->
+    <section id="practiceStatusBox" class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl shadow-black/30 flex flex-col gap-2.5">
+      <div class="flex items-center justify-between text-[11px]">
+        <span class="font-extrabold text-slate-300">⚽ 연습 모드 공 선택</span>
+        <span id="aiStageDisplay" class="font-extrabold text-amber-300">파란팀: 기본공 vs AI: 기본공</span>
       </div>
-
-      <div id="skinsPanel" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
-
-      <div id="rankingPanel" class="hidden flex-col gap-3">
-        <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-950/90 border border-slate-800 rounded-xl px-3.5 py-2.5">
-          <div>
-            <div class="text-xs sm:text-sm font-extrabold text-blue-300">🏆 공대공 명예의 전당 (실시간 통합 순위)</div>
-            <div class="text-[11px] text-slate-400 mt-0.5">대전 모드 전적만 기록 (10승 선승제 · 승/패)</div>
-          </div>
-          <button id="refreshRankingBtn" type="button" class="px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition active:scale-95">
-            🔄 새로고침
-          </button>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        <div class="bg-slate-950/85 border border-blue-500/40 rounded-xl p-2.5">
+          <div id="practiceBlueTitle" class="text-[11px] font-black text-blue-300 mb-1.5">🔵 내 공 (6종 선택)</div>
+          <div id="practiceBlueGrid" class="grid grid-cols-3 gap-1.5"></div>
         </div>
-
-        <div id="myRankSummaryBox" class="rounded-xl bg-gradient-to-r from-sky-950/50 via-slate-950 to-slate-950 border border-sky-500/35 px-3.5 py-2.5 flex items-center justify-between text-xs">
-          <span class="text-slate-300 font-semibold">내 현재 순위:</span>
-          <span id="myRankDetailText" class="font-extrabold text-sky-300">로그인 후 [서버저장] 시 순위에 등록됩니다</span>
+        <div class="bg-slate-950/85 border border-rose-500/40 rounded-xl p-2.5">
+          <div class="text-[11px] font-black text-rose-300 mb-1.5">🔴 AI 상대 공 (6종 선택)</div>
+          <div id="practiceAiGrid" class="grid grid-cols-3 gap-1.5"></div>
         </div>
-
-        <div id="rankingListContainer" class="flex flex-col gap-2 max-h-[380px] overflow-y-auto pr-1"></div>
       </div>
     </section>
 
@@ -450,9 +431,9 @@
   <!-- 초기화 모달 -->
   <div id="resetModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-sm p-4">
     <div class="bg-slate-900 border border-slate-700 rounded-2xl max-w-sm w-full p-5 shadow-2xl">
-      <h2 class="text-base font-extrabold text-slate-100 mb-1.5">배틀 기록 초기화</h2>
+      <h2 class="text-base font-extrabold text-slate-100 mb-1.5">라운드 초기화</h2>
       <p class="text-xs text-slate-400 leading-relaxed mb-4">
-        승리 전적, 골드 및 스킨 보유 기록을 모두 초기화하고 처음부터 다시 시작할까요?
+        현재 진행 중인 라운드와 스코어를 초기화하고 새로 시작할까요?
       </p>
       <div class="flex justify-end gap-2">
         <button id="resetCancelBtn" type="button" class="px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 transition">
@@ -589,6 +570,7 @@
       let hasUnsavedChanges = false;
       let currentMode = 'practice';
       let aiStageIndex = 0;
+      let practiceEnemySkinId = 'classic';
       let pvpRoomName = null;
       let pvpRole = null;
 
@@ -597,19 +579,19 @@
       }
 
       const SKINS = [
-        { id: 'classic', name: '기본공', cost: 0, color: '#38bdf8', power: 10, skill: 'none', desc: '표준 회전형 기본공' },
-        { id: 'vampire', name: '흡혈공', cost: 5000, color: '#dc2626', power: 14, skill: 'vampire', desc: '상대 공과 닿으면 3초간 피를 3씩 흡수' },
-        { id: 'dagger', name: '단검공', cost: 12000, color: '#cbd5e1', power: 18, skill: 'dagger', desc: '공 주변에 단검이 빙글빙글 돌며 공격' },
-        { id: 'web', name: '거미줄공', cost: 20000, color: '#e2e8f0', power: 20, skill: 'web', desc: '벽에 부딪힐 때마다 거미줄 설치 (닿으면 피 -1)' },
-        { id: 'virus', name: '바이러스공', cost: 32000, color: '#4ade80', power: 22, skill: 'virus', desc: '접촉 시 상대 피가 10초간 1씩 추가 감소' },
-        { id: 'laser', name: '광선공', cost: 50000, color: '#ec4899', power: 26, skill: 'laser', desc: '상대방을 향해 광선 미사일을 연속 발사', isVipFree: true }
+        { id: 'classic', name: '기본공', cost: 0, color: '#38bdf8', power: 15, skill: 'none', desc: '표준 회전형 기본공' },
+        { id: 'vampire', name: '흡혈공', cost: 0, color: '#dc2626', power: 15, skill: 'vampire', desc: '상대 공과 닿으면 3초간 피를 3씩 흡수' },
+        { id: 'dagger', name: '단검공', cost: 0, color: '#cbd5e1', power: 15, skill: 'dagger', desc: '공 주변에 단검이 빙글빙글 돌며 공격' },
+        { id: 'web', name: '거미줄공', cost: 0, color: '#e2e8f0', power: 15, skill: 'web', desc: '벽 충돌 시 거미줄 설치 (본인 회복 +1 / 상대 -1)' },
+        { id: 'virus', name: '바이러스공', cost: 0, color: '#4ade80', power: 15, skill: 'virus', desc: '접촉 시 상대 피가 10초간 1씩 추가 감소' },
+        { id: 'laser', name: '광선공', cost: 0, color: '#ec4899', power: 15, skill: 'laser', desc: '상대방을 향해 광선 미사일을 연속 발사' }
       ];
 
       const defaultState = () => ({
         wins: 0,
         losses: 0,
         gold: 300,
-        ownedSkins: ['classic'],
+        ownedSkins: SKINS.map(s => s.id),
         equippedSkinId: 'classic',
         soundEnabled: true,
         bgmEnabled: true,
@@ -620,13 +602,7 @@
         const base = defaultState();
         if (!parsed || typeof parsed !== 'object') return base;
         const isVip = (typeof parsed.isVip === 'boolean' ? parsed.isVip : false) || isAdminAccount(currentUsername);
-        let ownedSkins = Array.isArray(parsed.ownedSkins) && parsed.ownedSkins.length > 0
-          ? parsed.ownedSkins.filter(id => SKINS.some(sk => sk.id === id))
-          : [...base.ownedSkins];
-        if (!ownedSkins.includes('classic')) ownedSkins.unshift('classic');
-        if (isVip) {
-          SKINS.forEach(s => { if (!ownedSkins.includes(s.id)) ownedSkins.push(s.id); });
-        }
+        let ownedSkins = SKINS.map(sk => sk.id);
         return {
           wins: typeof parsed.wins === 'number' && parsed.wins >= 0 ? Math.floor(parsed.wins) : base.wins,
           losses: typeof parsed.losses === 'number' && parsed.losses >= 0 ? Math.floor(parsed.losses) : base.losses,
@@ -670,8 +646,7 @@
             hasUnsavedChanges = false;
             document.getElementById('syncStatusText').textContent = `클라우드 DB 저장 완료 (${data.savedAt})`;
             if (showNotification) showToast(`🟨 [${currentUsername}] 클라우드 서버에 전적이 안전하게 저장되었습니다!`);
-            fetchAndRenderRanking();
-          }
+                      }
         } catch (err) {}
       }
 
@@ -709,7 +684,8 @@
       window.addEventListener('resize', resizeCanvas);
 
       let playerBall = { x: 160, y: 200, vx: 2.8, vy: 2.0, radius: 38, hp: 100, maxHp: 100, skillTimer: 0, daggerAngle: 0, daggerCd: 0 };
-      let enemyBall = { x: 640, y: 200, vx: -2.8, vy: -2.0, radius: 38, hp: 100, maxHp: 100, skillTimer: 0, vampireTimer: 0, vampireAcc: 0, virusTimer: 0, virusAcc: 0 };
+      let enemyBall = { x: 640, y: 200, vx: -2.8, vy: -2.0, radius: 38, hp: 100, maxHp: 100, skillTimer: 0, vampireTimer: 0, vampireAcc: 0, virusTimer: 0, virusAcc: 0, daggerAngle: 0, daggerCd: 0 };
+      let playerVampireTimer = 0, playerVampireAcc = 0, playerVirusTimer = 0, playerVirusAcc = 0;
       let projectiles = [];
       let particles = [];
       let webs = [];
@@ -730,27 +706,35 @@
         enemyBall.vy = (Math.random() - 0.5) * 3;
 
         playerBall.skillTimer = 0; playerBall.daggerCd = 0;
-        enemyBall.skillTimer = 0; enemyBall.vampireTimer = 0; enemyBall.vampireAcc = 0;
+        enemyBall.skillTimer = 0; enemyBall.daggerCd = 0;
+        enemyBall.vampireTimer = 0; enemyBall.vampireAcc = 0;
         enemyBall.virusTimer = 0; enemyBall.virusAcc = 0;
+        playerVampireTimer = 0; playerVampireAcc = 0;
+        playerVirusTimer = 0; playerVirusAcc = 0;
         projectiles = [];
         webs = [];
         if (currentMode === 'practice') {
-          const currentAiSkin = SKINS[aiStageIndex % SKINS.length];
-          const enemyMax = 100 + aiStageIndex * 25;
-          enemyBall.maxHp = enemyMax;
-          enemyBall.hp = enemyMax;
-          document.getElementById('enemyLabelName').textContent = `🔴 적 공 (${currentAiSkin.name})`;
-          document.getElementById('aiStageDisplay').textContent = `Stage ${aiStageIndex + 1}: ${currentAiSkin.name}`;
+          const blueSkin = getEquippedSkin();
+          const currentAiSkin = getEnemySkin();
+          enemyBall.maxHp = 100;
+          enemyBall.hp = 100;
+          const myId = getDisplayName();
+          document.getElementById('playerLabelName').textContent = `🔵 ${myId} (${blueSkin.name})`;
+          document.getElementById('enemyLabelName').textContent = `🔴 AI (${currentAiSkin.name})`;
+          document.getElementById('aiStageDisplay').textContent = `${myId}: ${blueSkin.name} vs AI: ${currentAiSkin.name}`;
         } else {
           enemyBall.maxHp = 100;
           enemyBall.hp = 100;
         }
-        document.getElementById('matchScoreText').textContent = `${matchScore.player} : ${matchScore.enemy} (10선승)`;
+        document.getElementById('matchScoreText').textContent = `${matchScore.player} : ${matchScore.enemy}`;
         battleActive = true;
       }
 
       function getEquippedSkin() {
         return SKINS.find(s => s.id === state.equippedSkinId) || SKINS[0];
+      }
+      function getEnemySkin() {
+        return SKINS.find(s => s.id === practiceEnemySkinId) || SKINS[0];
       }
 
       function getPlayerDamage() {
@@ -760,9 +744,7 @@
       }
 
       function getAiDamage() {
-        if (currentMode === 'pvp') return 12;
-        const currentAiSkin = SKINS[aiStageIndex % SKINS.length];
-        return Math.round(currentAiSkin.power * 0.7);
+        return 15;
       }
 
       let lastTime = 0;
@@ -783,105 +765,117 @@
             if (eSpeed > 6.5) { enemyBall.vx = (enemyBall.vx / eSpeed) * 6.5; enemyBall.vy = (enemyBall.vy / eSpeed) * 6.5; }
 
             const skin = getEquippedSkin();
+            const aiSkin = currentMode === 'practice' ? getEnemySkin() : SKINS[0];
             let hitWall = false;
             if (playerBall.x - playerBall.radius < 0) { playerBall.x = playerBall.radius; playerBall.vx *= -1; hitWall = true; }
             if (playerBall.x + playerBall.radius > canvasWidth) { playerBall.x = canvasWidth - playerBall.radius; playerBall.vx *= -1; hitWall = true; }
             if (playerBall.y - playerBall.radius < 0) { playerBall.y = playerBall.radius; playerBall.vy *= -1; hitWall = true; }
             if (playerBall.y + playerBall.radius > canvasHeight) { playerBall.y = canvasHeight - playerBall.radius; playerBall.vy *= -1; hitWall = true; }
 
-            // 4. 거미줄공: 벽에 부딪힐 때마다 거미줄 설치
             if (hitWall && skin.skill === 'web') {
-              if (webs.length >= 8) webs.shift();
-              webs.push({ x: playerBall.x, y: playerBall.y, radius: 36, life: 12, hitCd: 0 });
+              if (webs.length >= 10) webs.shift();
+              webs.push({ x: playerBall.x, y: playerBall.y, radius: 36, life: 12, hitCd: 0, healCd: 0, owner: 'player' });
             }
 
-            if (enemyBall.x - enemyBall.radius < 0) { enemyBall.x = enemyBall.radius; enemyBall.vx *= -1; }
-            if (enemyBall.x + enemyBall.radius > canvasWidth) { enemyBall.x = canvasWidth - enemyBall.radius; enemyBall.vx *= -1; }
-            if (enemyBall.y - enemyBall.radius < 0) { enemyBall.y = enemyBall.radius; enemyBall.vy *= -1; }
-            if (enemyBall.y + enemyBall.radius > canvasHeight) { enemyBall.y = canvasHeight - enemyBall.radius; enemyBall.vy *= -1; }
+            let aiHitWall = false;
+            if (enemyBall.x - enemyBall.radius < 0) { enemyBall.x = enemyBall.radius; enemyBall.vx *= -1; aiHitWall = true; }
+            if (enemyBall.x + enemyBall.radius > canvasWidth) { enemyBall.x = canvasWidth - enemyBall.radius; enemyBall.vx *= -1; aiHitWall = true; }
+            if (enemyBall.y - enemyBall.radius < 0) { enemyBall.y = enemyBall.radius; enemyBall.vy *= -1; aiHitWall = true; }
+            if (enemyBall.y + enemyBall.radius > canvasHeight) { enemyBall.y = canvasHeight - enemyBall.radius; enemyBall.vy *= -1; aiHitWall = true; }
 
-            // 2. 흡혈공 지속 효과 (3초간 1초당 피 3씩 흡수)
+            if (aiHitWall && aiSkin.skill === 'web') {
+              if (webs.length >= 10) webs.shift();
+              webs.push({ x: enemyBall.x, y: enemyBall.y, radius: 36, life: 12, hitCd: 0, healCd: 0, owner: 'enemy' });
+            }
+
+            // 2. 흡혈공 지속 효과 (양쪽 모두 지원)
             if (enemyBall.vampireTimer > 0) {
-              enemyBall.vampireTimer -= dt;
-              enemyBall.vampireAcc += dt;
-              if (enemyBall.vampireAcc >= 1.0) {
-                enemyBall.vampireAcc -= 1.0;
-                enemyBall.hp = Math.max(0, enemyBall.hp - 3);
-                playerBall.hp = Math.min(playerBall.maxHp, playerBall.hp + 3);
-              }
+              enemyBall.vampireTimer -= dt; enemyBall.vampireAcc += dt;
+              if (enemyBall.vampireAcc >= 1.0) { enemyBall.vampireAcc -= 1.0; enemyBall.hp = Math.max(0, enemyBall.hp - 3); playerBall.hp = Math.min(playerBall.maxHp, playerBall.hp + 3); }
+            }
+            if (playerVampireTimer > 0) {
+              playerVampireTimer -= dt; playerVampireAcc += dt;
+              if (playerVampireAcc >= 1.0) { playerVampireAcc -= 1.0; playerBall.hp = Math.max(0, playerBall.hp - 3); enemyBall.hp = Math.min(enemyBall.maxHp, enemyBall.hp + 3); }
             }
 
-            // 5. 바이러스공 지속 효과 (10초간 1초당 피 1씩 추가 감소)
+            // 5. 바이러스공 지속 효과 (양쪽 모두 지원)
             if (enemyBall.virusTimer > 0) {
-              enemyBall.virusTimer -= dt;
-              enemyBall.virusAcc += dt;
-              if (enemyBall.virusAcc >= 1.0) {
-                enemyBall.virusAcc -= 1.0;
-                enemyBall.hp = Math.max(0, enemyBall.hp - 1);
-              }
+              enemyBall.virusTimer -= dt; enemyBall.virusAcc += dt;
+              if (enemyBall.virusAcc >= 1.0) { enemyBall.virusAcc -= 1.0; enemyBall.hp = Math.max(0, enemyBall.hp - 1); }
+            }
+            if (playerVirusTimer > 0) {
+              playerVirusTimer -= dt; playerVirusAcc += dt;
+              if (playerVirusAcc >= 1.0) { playerVirusAcc -= 1.0; playerBall.hp = Math.max(0, playerBall.hp - 1); }
             }
 
-            // 3. 단검공: 공 주변 단검 3개 회전 및 타격
+            // 3. 단검공 (양쪽 모두 지원)
             if (skin.skill === 'dagger') {
               playerBall.daggerAngle += dt * 4.8;
               if (playerBall.daggerCd > 0) playerBall.daggerCd -= dt;
-              const orbitR = playerBall.radius + 20;
+              const orbitR = playerBall.radius + 28;
               for (let k = 0; k < 3; k++) {
                 const ang = playerBall.daggerAngle + (k * Math.PI * 2) / 3;
-                const dxBlade = playerBall.x + Math.cos(ang) * orbitR - enemyBall.x;
-                const dyBlade = playerBall.y + Math.sin(ang) * orbitR - enemyBall.y;
-                if (Math.hypot(dxBlade, dyBlade) < enemyBall.radius + 10 && playerBall.daggerCd <= 0) {
-                  enemyBall.hp = Math.max(0, enemyBall.hp - 6);
-                  playerBall.daggerCd = 0.25;
-                  break;
+                if (Math.hypot(playerBall.x + Math.cos(ang) * orbitR - enemyBall.x, playerBall.y + Math.sin(ang) * orbitR - enemyBall.y) < enemyBall.radius + 18 && playerBall.daggerCd <= 0) {
+                  enemyBall.hp = Math.max(0, enemyBall.hp - 6); playerBall.daggerCd = 0.25; break;
+                }
+              }
+            }
+            if (aiSkin.skill === 'dagger') {
+              enemyBall.daggerAngle += dt * 4.8;
+              if (enemyBall.daggerCd > 0) enemyBall.daggerCd -= dt;
+              const orbitR = enemyBall.radius + 28;
+              for (let k = 0; k < 3; k++) {
+                const ang = enemyBall.daggerAngle + (k * Math.PI * 2) / 3;
+                if (Math.hypot(enemyBall.x + Math.cos(ang) * orbitR - playerBall.x, enemyBall.y + Math.sin(ang) * orbitR - playerBall.y) < playerBall.radius + 18 && enemyBall.daggerCd <= 0) {
+                  playerBall.hp = Math.max(0, playerBall.hp - 6); enemyBall.daggerCd = 0.25; break;
                 }
               }
             }
 
-            // 4. 거미줄공: 거미줄에 닿으면 상대 피 1씩 감소
+            // 4. 거미줄공: 본인 접촉 시 피 회복(+1), 상대 접촉 시 피 감소(-1)
             for (let i = webs.length - 1; i >= 0; i--) {
               const wb = webs[i];
               wb.life -= dt;
               if (wb.hitCd > 0) wb.hitCd -= dt;
+              if (wb.healCd > 0) wb.healCd -= dt;
               if (wb.life <= 0) { webs.splice(i, 1); continue; }
-              if (Math.hypot(enemyBall.x - wb.x, enemyBall.y - wb.y) < enemyBall.radius + wb.radius && wb.hitCd <= 0) {
-                enemyBall.hp = Math.max(0, enemyBall.hp - 1);
+              const ownerBall = wb.owner === 'enemy' ? enemyBall : playerBall;
+              const targetBall = wb.owner === 'enemy' ? playerBall : enemyBall;
+              if (Math.hypot(targetBall.x - wb.x, targetBall.y - wb.y) < targetBall.radius + wb.radius && wb.hitCd <= 0) {
+                targetBall.hp = Math.max(0, targetBall.hp - 1);
                 wb.hitCd = 0.35;
+              }
+              if (Math.hypot(ownerBall.x - wb.x, ownerBall.y - wb.y) < ownerBall.radius + wb.radius && wb.healCd <= 0) {
+                ownerBall.hp = Math.min(ownerBall.maxHp, ownerBall.hp + 1);
+                wb.healCd = 0.35;
               }
             }
 
-            // 6. 광선공: 상대방을 향해 광선 미사일 발사
+            // 6. 광선공 (양쪽 모두 지원)
             if (skin.skill === 'laser') {
               playerBall.skillTimer += dt;
               if (playerBall.skillTimer >= 1.1) {
                 playerBall.skillTimer = 0;
-                const tx = enemyBall.x - playerBall.x;
-                const ty = enemyBall.y - playerBall.y;
-                const td = Math.hypot(tx, ty) || 1;
-                projectiles.push({
-                  x: playerBall.x,
-                  y: playerBall.y,
-                  vx: (tx / td) * 10.5,
-                  vy: (ty / td) * 10.5,
-                  radius: 7,
-                  color: '#ec4899',
-                  owner: 'player',
-                  type: 'laser'
-                });
+                const tx = enemyBall.x - playerBall.x, ty = enemyBall.y - playerBall.y, td = Math.hypot(tx, ty) || 1;
+                projectiles.push({ x: playerBall.x, y: playerBall.y, vx: (tx / td) * 10.5, vy: (ty / td) * 10.5, radius: 7, color: '#ec4899', owner: 'player' });
+              }
+            }
+            if (aiSkin.skill === 'laser') {
+              enemyBall.skillTimer += dt;
+              if (enemyBall.skillTimer >= 1.1) {
+                enemyBall.skillTimer = 0;
+                const tx = playerBall.x - enemyBall.x, ty = playerBall.y - enemyBall.y, td = Math.hypot(tx, ty) || 1;
+                projectiles.push({ x: enemyBall.x, y: enemyBall.y, vx: (tx / td) * 10.5, vy: (ty / td) * 10.5, radius: 7, color: '#f43f5e', owner: 'enemy' });
               }
             }
 
             for (let i = projectiles.length - 1; i >= 0; i--) {
               let pr = projectiles[i];
               pr.x += pr.vx; pr.y += pr.vy;
-              if (pr.x < 0 || pr.x > canvasWidth || pr.y < 0 || pr.y > canvasHeight) {
-                projectiles.splice(i, 1);
-                continue;
-              }
-              const pdx = enemyBall.x - pr.x;
-              const pdy = enemyBall.y - pr.y;
-              if (Math.sqrt(pdx * pdx + pdy * pdy) < enemyBall.radius + pr.radius) {
-                enemyBall.hp = Math.max(0, enemyBall.hp - (pr.owner === 'player' ? 16 : 0));
+              if (pr.x < 0 || pr.x > canvasWidth || pr.y < 0 || pr.y > canvasHeight) { projectiles.splice(i, 1); continue; }
+              const target = pr.owner === 'player' ? enemyBall : playerBall;
+              if (Math.hypot(target.x - pr.x, target.y - pr.y) < target.radius + pr.radius) {
+                target.hp = Math.max(0, target.hp - 16);
                 projectiles.splice(i, 1);
               }
             }
@@ -915,11 +909,10 @@
               playerBall.hp = Math.max(0, playerBall.hp - aDmg);
 
               // 접촉 스킬 발동 (흡혈공 3초, 바이러스공 10초)
-              if (skin.skill === 'vampire') {
-                enemyBall.vampireTimer = 3.0;
-              } else if (skin.skill === 'virus') {
-                enemyBall.virusTimer = 10.0;
-              }
+              if (skin.skill === 'vampire') enemyBall.vampireTimer = 3.0;
+              else if (skin.skill === 'virus') enemyBall.virusTimer = 10.0;
+              if (aiSkin.skill === 'vampire') playerVampireTimer = 3.0;
+              else if (aiSkin.skill === 'virus') playerVirusTimer = 10.0;
 
               for (let i = 0; i < 8; i++) {
                 particles.push({
@@ -934,52 +927,27 @@
               }
             }
 
-            // 라운드 승패 판정 (10승 선승제, 대전모드만 전적/랭킹 기록)
+            // 라운드 승패 판정 (단판 결과 중앙 표시 -> 클릭 시 다음 라운드)
             if (enemyBall.hp <= 0 || playerBall.hp <= 0) {
               const playerWonRound = enemyBall.hp <= 0;
               battleActive = false;
-              if (playerWonRound) {
-                matchScore.player += 1;
-                const reward = (250 + aiStageIndex * 120) * (state.isVip ? 5 : 1);
-                state.gold += reward;
-                if (currentMode === 'practice') aiStageIndex = (aiStageIndex + 1) % SKINS.length;
-                showToast(`🎉 라운드 승리! (${matchScore.player}:${matchScore.enemy}) +${reward}G`);
-              } else {
-                matchScore.enemy += 1;
-                showToast(`💥 라운드 패배 (${matchScore.player}:${matchScore.enemy})`);
-              }
-              document.getElementById('matchScoreText').textContent = `${matchScore.player} : ${matchScore.enemy} (10선승)`;
+              if (playerWonRound) matchScore.player += 1;
+              else matchScore.enemy += 1;
+              document.getElementById('matchScoreText').textContent = `${matchScore.player} : ${matchScore.enemy}`;
 
-              if (matchScore.player >= 10 || matchScore.enemy >= 10) {
-                const iWonMatch = matchScore.player >= 10;
-                const winnerLabel = iWonMatch ? getDisplayName() : (document.getElementById('enemyLabelName').textContent.replace(/^[🔴🔵]\s*/, '') || '상대');
-                if (currentMode === 'pvp') {
-                  if (iWonMatch) state.wins += 1;
-                  else state.losses += 1;
-                  saveState(true);
-                  socket.emit('pvp_match_finished', { room: pvpRoomName, winner: winnerLabel });
-                } else {
-                  saveState(false);
-                }
-                updateUI();
-                document.getElementById('matchWinnerId').textContent = winnerLabel;
-                document.getElementById('matchResultBanner').classList.remove('hidden');
-                document.getElementById('matchResultBanner').classList.add('flex');
-                setTimeout(() => {
-                  document.getElementById('matchResultBanner').classList.add('hidden');
-                  document.getElementById('matchResultBanner').classList.remove('flex');
-                  matchScore = { player: 0, enemy: 0 };
-                  if (currentMode === 'pvp') {
-                    returnBothToPvpLobby();
-                  } else {
-                    resetRound();
-                  }
-                }, 2800);
-              } else {
-                saveState(false);
-                updateUI();
-                setTimeout(resetRound, 1100);
-              }
+              const enemyDisplay = currentMode === 'practice'
+                ? 'AI'
+                : (document.getElementById('enemyLabelName').textContent.replace(/^[🔴🔵]\s*/, '') || '상대');
+              const resultText = playerWonRound
+                ? `${getDisplayName()} 승리!`
+                : `${enemyDisplay} 승리!`;
+
+              const ro = document.getElementById('roundResultOverlay');
+              document.getElementById('roundResultTitle').textContent = (playerWonRound ? '🏆 ' : '💥 ') + resultText;
+              document.getElementById('roundResultTitle').className = 'text-xl sm:text-2xl font-black ' + (playerWonRound ? 'text-amber-300' : 'text-rose-400');
+              document.getElementById('roundResultSub').textContent = `현재 스코어 ${matchScore.player} : ${matchScore.enemy}`;
+              ro.classList.remove('hidden');
+              ro.classList.add('flex');
             }
 
             if (currentMode === 'pvp' && pvpRoomName) {
@@ -1031,23 +999,23 @@
             ctx.restore();
           });
 
-          // 단검공 회전 단검 렌더링
-          if (getEquippedSkin().skill === 'dagger') {
-            const orbitR = playerBall.radius + 20;
+          // 단검공 회전 단검 렌더링 (아군 & AI - 긴 단검)
+          [[getEquippedSkin().skill === 'dagger', playerBall], [currentMode === 'practice' && getEnemySkin().skill === 'dagger', enemyBall]].forEach(([on, ball]) => {
+            if (!on) return;
+            const orbitR = ball.radius + 28;
             for (let k = 0; k < 3; k++) {
-              const ang = playerBall.daggerAngle + (k * Math.PI * 2) / 3;
-              const bx = playerBall.x + Math.cos(ang) * orbitR;
-              const by = playerBall.y + Math.sin(ang) * orbitR;
+              const ang = ball.daggerAngle + (k * Math.PI * 2) / 3;
               ctx.save();
-              ctx.translate(bx, by);
+              ctx.translate(ball.x + Math.cos(ang) * orbitR, ball.y + Math.sin(ang) * orbitR);
               ctx.rotate(ang + Math.PI / 2);
               ctx.fillStyle = '#f8fafc';
-              ctx.beginPath();
-              ctx.moveTo(0, -10); ctx.lineTo(5, 6); ctx.lineTo(-5, 6); ctx.closePath();
-              ctx.fill();
+              ctx.beginPath(); ctx.moveTo(0, -24); ctx.lineTo(5, 6); ctx.lineTo(-5, 6); ctx.closePath(); ctx.fill();
+              ctx.strokeStyle = '#94a3b8'; ctx.lineWidth = 1; ctx.stroke();
+              ctx.fillStyle = '#f59e0b'; ctx.fillRect(-7, 5, 14, 3);
+              ctx.fillStyle = '#475569'; ctx.fillRect(-2.5, 8, 5, 6);
               ctx.restore();
             }
-          }
+          });
 
           projectiles.forEach(pr => {
             ctx.fillStyle = pr.color;
@@ -1068,7 +1036,7 @@
           ctx.fillText(Math.round(playerBall.hp), playerBall.x, playerBall.y);
           ctx.restore();
 
-          const enemyColor = currentMode === 'pvp' ? '#f43f5e' : (SKINS[aiStageIndex % SKINS.length].color);
+          const enemyColor = currentMode === 'pvp' ? '#f43f5e' : getEnemySkin().color;
           ctx.save();
           ctx.shadowColor = enemyColor; ctx.shadowBlur = 20;
           ctx.fillStyle = enemyColor;
@@ -1091,22 +1059,20 @@
         requestAnimationFrame(gameLoop);
       }
 
-      document.getElementById('launchActionBtn').addEventListener('click', () => {
-        playerBall.vx += (Math.random() - 0.5) * 8 + 3;
-        playerBall.vy += (Math.random() - 0.5) * 6;
-        showToast('⚡ 공에 부스터 임펄스 주입!');
+      document.getElementById('roundResultOverlay').addEventListener('click', () => {
+        const ro = document.getElementById('roundResultOverlay');
+        ro.classList.add('hidden');
+        ro.classList.remove('flex');
+        resetRound();
       });
 
-      canvasWrapper.addEventListener('pointerdown', () => {
-        playerBall.vx += 3;
-        playerBall.vy += (Math.random() - 0.5) * 5;
-      });
-
-      window.addEventListener('keydown', (e) => {
-        if (e.code === 'Space' && !e.repeat) {
-          e.preventDefault();
-          playerBall.vx += 4;
-        }
+      document.getElementById('matchResultBanner').addEventListener('click', () => {
+        const mb = document.getElementById('matchResultBanner');
+        mb.classList.add('hidden');
+        mb.classList.remove('flex');
+        matchScore = { player: 0, enemy: 0 };
+        if (currentMode === 'pvp') returnBothToPvpLobby();
+        else resetRound();
       });
 
       initSocketConnection();
@@ -1131,11 +1097,12 @@
         const joinRightBtn = document.getElementById('joinRightBtn');
 
         if (leftP) {
-          leftNameEl.textContent = `${leftP.username} (참가중)`;
+          const lSkin = SKINS.find(sk => sk.id === leftP.skinId)?.name || '기본공';
+          leftNameEl.textContent = `${leftP.username} (${lSkin}) · 참가 대기중`;
           if (leftP.socketId === socket.id) {
-            joinLeftBtn.textContent = '참가 취소';
+            joinLeftBtn.textContent = '⏳ 참가 대기중';
             joinLeftBtn.disabled = false;
-            joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer';
+            joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
           } else {
             joinLeftBtn.textContent = '다른 유저 선점됨';
             joinLeftBtn.disabled = true;
@@ -1148,11 +1115,12 @@
         }
 
         if (rightP) {
-          rightNameEl.textContent = `${rightP.username} (참가중)`;
+          const rSkin = SKINS.find(sk => sk.id === rightP.skinId)?.name || '기본공';
+          rightNameEl.textContent = `${rightP.username} (${rSkin}) · 참가 대기중`;
           if (rightP.socketId === socket.id) {
-            joinRightBtn.textContent = '참가 취소';
+            joinRightBtn.textContent = '⏳ 참가 대기중';
             joinRightBtn.disabled = false;
-            joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:bg-slate-700 transition cursor-pointer';
+            joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
           } else {
             joinRightBtn.textContent = '다른 유저 선점됨';
             joinRightBtn.disabled = true;
@@ -1247,11 +1215,11 @@
         modePracticeTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow transition cursor-pointer';
         modePvPTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer';
         practiceStatusBox.classList.remove('hidden');
-        practiceStatusBox.classList.add('grid');
+        practiceStatusBox.classList.add('flex');
         pvpLobbySection.classList.add('hidden');
         pvpLobbySection.classList.remove('flex');
         gameAreaSection.classList.remove('hidden');
-        document.getElementById('playerLabelName').textContent = '🔵 아군 공';
+        document.getElementById('playerLabelName').textContent = `🔵 ${getDisplayName()} (${getEquippedSkin().name})`;
         resetRound();
         showToast('⚽ 연습 모드로 전환되었습니다.');
       });
@@ -1261,7 +1229,7 @@
         modePracticeTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer';
         modePvPTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow transition cursor-pointer';
         practiceStatusBox.classList.add('hidden');
-        practiceStatusBox.classList.remove('grid');
+        practiceStatusBox.classList.remove('flex');
         pvpLobbySection.classList.remove('hidden');
         pvpLobbySection.classList.add('flex');
         gameAreaSection.classList.add('hidden');
@@ -1293,12 +1261,20 @@
 
       joinLeftBtn.addEventListener('click', () => {
         const username = getDisplayName();
-        socket.emit('join_pvp_lobby', { username, slot: 'left' });
+        const skin = getEquippedSkin();
+        document.getElementById('leftPlayerName').textContent = `${username} (${skin.name}) · 참가 대기중`;
+        joinLeftBtn.textContent = '⏳ 참가 대기중';
+        joinLeftBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
+        socket.emit('join_pvp_lobby', { username, slot: 'left', skinId: skin.id });
       });
 
       joinRightBtn.addEventListener('click', () => {
         const username = getDisplayName();
-        socket.emit('join_pvp_lobby', { username, slot: 'right' });
+        const skin = getEquippedSkin();
+        document.getElementById('rightPlayerName').textContent = `${username} (${skin.name}) · 참가 대기중`;
+        joinRightBtn.textContent = '⏳ 참가 대기중';
+        joinRightBtn.className = 'w-full py-2 rounded-xl text-xs font-extrabold bg-amber-500/20 border border-amber-400 text-amber-200 transition cursor-pointer';
+        socket.emit('join_pvp_lobby', { username, slot: 'right', skinId: skin.id });
       });
 
       pvpStartMatchBtn.addEventListener('click', () => {
@@ -1348,8 +1324,7 @@
         state.isVip = false;
         updateAuthHeaderUI();
         updateUI();
-        fetchAndRenderRanking();
-        showToast(expired ? '로그인 정보가 만료되었습니다.' : '로그아웃되었습니다.');
+                showToast(expired ? '로그인 정보가 만료되었습니다.' : '로그아웃되었습니다.');
       }
 
       function updateUI() {
@@ -1357,8 +1332,6 @@
         const totalGames = state.wins + state.losses;
         const winRate = totalGames > 0 ? Math.round((state.wins / totalGames) * 100) : 0;
 
-        document.getElementById('goldDisplay').textContent = formatNumber(state.gold);
-        document.getElementById('scoreDisplay').textContent = `승리: ${state.wins}승 ${state.losses}패 (${winRate}%)`;
         document.getElementById('equippedSkinDisplay').textContent = skin.name;
 
         const vipLabel = document.getElementById('vipHeaderBtnLabel');
@@ -1366,7 +1339,77 @@
 
         updateAuthHeaderUI();
         updateUiBoxColors();
-        renderSkinsPanel();
+        renderPracticeSelectors();
+      }
+
+      function renderPracticeSelectors() {
+        const blueTitle = document.getElementById('practiceBlueTitle');
+        if (blueTitle) blueTitle.textContent = `🔵 ${getDisplayName()} (내 공 6종 선택)`;
+        const pvpLbl = document.getElementById('pvpSelectedSkinLabel');
+        if (pvpLbl) pvpLbl.textContent = `선택: ${getEquippedSkin().name}`;
+        const pvpGrid = document.getElementById('pvpSkinSelectGrid');
+        if (pvpGrid) {
+          pvpGrid.innerHTML = '';
+          SKINS.forEach(sk => {
+            const isSel = state.equippedSkinId === sk.id;
+            const pBtn = document.createElement('button');
+            pBtn.type = 'button';
+            pBtn.className = 'px-2 py-1.5 rounded-lg text-[11px] font-extrabold border transition cursor-pointer truncate ' + (
+              isSel ? 'bg-indigo-600 border-indigo-300 text-white shadow' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-indigo-400'
+            );
+            pBtn.textContent = sk.name;
+            pBtn.onclick = () => {
+              state.equippedSkinId = sk.id;
+              saveState(true);
+              updateUI();
+              showToast(`⚽ 대전 공 [${sk.name}] 선택됨!`);
+            };
+            pvpGrid.appendChild(pBtn);
+          });
+        }
+        const blueGrid = document.getElementById('practiceBlueGrid');
+        const aiGrid = document.getElementById('practiceAiGrid');
+        if (!blueGrid || !aiGrid) return;
+        blueGrid.innerHTML = '';
+        aiGrid.innerHTML = '';
+        SKINS.forEach(sk => {
+          const isBlueSel = state.equippedSkinId === sk.id;
+          const bBtn = document.createElement('button');
+          bBtn.type = 'button';
+          bBtn.className = 'px-2 py-1.5 rounded-lg text-[11px] font-extrabold border transition cursor-pointer truncate ' + (
+            isBlueSel ? 'bg-blue-600 border-blue-300 text-white shadow' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-blue-400'
+          );
+          bBtn.textContent = sk.name;
+          bBtn.onclick = () => {
+            state.equippedSkinId = sk.id;
+            saveState(true);
+            updateUI();
+            if (currentMode === 'practice') {
+              const myId = getDisplayName();
+              document.getElementById('playerLabelName').textContent = `🔵 ${myId} (${sk.name})`;
+              document.getElementById('aiStageDisplay').textContent = `${myId}: ${sk.name} vs AI: ${getEnemySkin().name}`;
+            }
+          };
+          blueGrid.appendChild(bBtn);
+
+          const isAiSel = practiceEnemySkinId === sk.id;
+          const aBtn = document.createElement('button');
+          aBtn.type = 'button';
+          aBtn.className = 'px-2 py-1.5 rounded-lg text-[11px] font-extrabold border transition cursor-pointer truncate ' + (
+            isAiSel ? 'bg-rose-600 border-rose-300 text-white shadow' : 'bg-slate-900 border-slate-700 text-slate-300 hover:border-rose-400'
+          );
+          aBtn.textContent = sk.name;
+          aBtn.onclick = () => {
+            practiceEnemySkinId = sk.id;
+            updateUI();
+            if (currentMode === 'practice') {
+              const myId = getDisplayName();
+              document.getElementById('enemyLabelName').textContent = `🔴 AI (${sk.name})`;
+              document.getElementById('aiStageDisplay').textContent = `${myId}: ${getEquippedSkin().name} vs AI: ${sk.name}`;
+            }
+          };
+          aiGrid.appendChild(aBtn);
+        });
       }
 
       function formatNumber(num) {
@@ -1387,115 +1430,7 @@
         }, 2200);
       }
 
-      function renderSkinsPanel() {
-        const panel = document.getElementById('skinsPanel');
-        panel.innerHTML = '';
-        SKINS.forEach(s => {
-          const owned = state.ownedSkins.includes(s.id) || (state.isVip && !s.isVipOnly);
-          const equipped = state.equippedSkinId === s.id;
-          const isVipOnly = s.isVipOnly === true;
-          const canBuy = !owned && state.gold >= s.cost && !isVipOnly;
 
-          const card = document.createElement('div');
-          card.className = `rounded-xl p-2.5 border transition flex items-center justify-between gap-2 ${
-            equipped ? 'bg-blue-950/30 border-blue-500/70 shadow-sm' : owned ? 'bg-slate-950/80 border-slate-700/80' : 'bg-slate-950/60 border-slate-800/90'
-          }`;
-          card.innerHTML = `
-            <div class="flex items-center gap-2.5 min-w-0">
-              <div class="w-8 h-8 rounded-lg flex items-center justify-center text-base shrink-0" style="background: ${s.color}25; border: 1px solid ${s.color}60;">⚽</div>
-              <div class="min-w-0">
-                <div class="flex items-center gap-1.5">
-                  <span class="text-xs font-extrabold text-slate-100 truncate">${s.isVipOnly ? '👑 ' : ''}${s.name}</span>
-                  <span class="text-[9px] font-bold px-1.5 py-0.2 rounded ${equipped ? 'bg-blue-500/20 text-blue-300 border border-blue-500/40' : owned ? 'bg-slate-800 text-slate-300' : 'bg-slate-900 text-slate-400'}">${equipped ? '장착' : owned ? '보유' : formatNumber(s.cost) + 'G'}</span>
-                </div>
-                <div class="text-[10px] text-slate-400 truncate mt-0.5">${s.desc} (공격력 ${s.power})</div>
-              </div>
-            </div>
-            <button type="button" class="shrink-0 py-1.5 px-3 rounded-lg text-xs font-extrabold transition ${
-              equipped ? 'bg-slate-800 text-blue-300 cursor-default' : owned || (isVipOnly && state.isVip) ? 'bg-blue-600 hover:bg-blue-500 text-white cursor-pointer' : isVipOnly ? 'bg-gradient-to-r from-fuchsia-600 to-purple-600 text-white cursor-pointer' : canBuy ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 cursor-pointer' : 'bg-slate-800 text-slate-500 cursor-not-allowed'
-            }">${equipped ? '장착중' : owned || (isVipOnly && state.isVip) ? '장착' : isVipOnly ? 'VIP' : '구매'}</button>
-          `;
-
-          card.querySelector('button').addEventListener('click', () => {
-            if (equipped) return;
-            if (isVipOnly && !state.isVip) { openVipModal(); return; }
-            if (owned || (isVipOnly && state.isVip)) {
-              state.equippedSkinId = s.id;
-              saveState(true); updateUI(); updateUiBoxColors();
-              showToast(`⚽ [${s.name}] 공 장착 완료!`);
-              return;
-            }
-            if (state.gold >= s.cost) {
-              state.gold -= s.cost;
-              state.ownedSkins.push(s.id);
-              state.equippedSkinId = s.id;
-              saveState(true); updateUI(); updateUiBoxColors();
-              showToast(`🎉 [${s.name}] 공 구매 및 장착 완료!`);
-            } else {
-              showToast('골드가 부족합니다!');
-            }
-          });
-          panel.appendChild(card);
-        });
-      }
-
-      async function fetchAndRenderRanking() {
-        const listContainer = document.getElementById('rankingListContainer');
-        const myRankDetail = document.getElementById('myRankDetailText');
-        try {
-          const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
-          const res = await fetch(`${API_BASE_URL}/api/ranking?gameId=${GAME_ID}`, { headers });
-          const data = await res.json();
-          if (!res.ok) throw new Error();
-
-          const rankings = data.rankings || [];
-          const myRank = data.myRank;
-
-          if (myRank) {
-            myRankDetail.textContent = `전체 ${data.totalPlayers}명 중 ${myRank.rank}위 (대전 전적: ${state.wins}승 ${state.losses}패)`;
-          }
-
-          listContainer.innerHTML = '';
-          rankings.forEach(item => {
-            const w = item.wins ?? item.saveData?.wins ?? item.score ?? 0;
-            const l = item.losses ?? item.saveData?.losses ?? (item.isMe ? state.losses : 0);
-            const row = document.createElement('div');
-            row.className = 'rounded-xl px-3.5 py-2.5 border bg-slate-950/80 border-slate-800 flex items-center justify-between';
-            row.innerHTML = `
-              <div class="flex items-center gap-2">
-                <span class="w-7 h-7 rounded-lg bg-slate-800 text-slate-200 font-extrabold text-xs flex items-center justify-center">${item.rank}</span>
-                <span class="text-xs font-bold text-slate-100">${item.maskedName}</span>
-              </div>
-              <div class="text-xs font-black text-blue-400">${w}승 ${l}패</div>
-            `;
-            listContainer.appendChild(row);
-          });
-        } catch (err) {
-          listContainer.innerHTML = `<div class="text-center py-4 text-xs text-slate-400">랭킹 서버 연결 대기 중</div>`;
-        }
-      }
-
-      const tabSkinsBtn = document.getElementById('tabSkinsBtn');
-      const tabRankingBtn = document.getElementById('tabRankingBtn');
-      const skinsPanel = document.getElementById('skinsPanel');
-      const rankingPanel = document.getElementById('rankingPanel');
-
-      tabSkinsBtn.addEventListener('click', () => {
-        tabSkinsBtn.className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-extrabold bg-slate-800 text-blue-300 shadow transition';
-        tabRankingBtn.className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-extrabold text-slate-400 hover:text-slate-200 transition';
-        skinsPanel.classList.remove('hidden'); skinsPanel.classList.add('grid');
-        rankingPanel.classList.add('hidden'); rankingPanel.classList.remove('flex');
-      });
-
-      tabRankingBtn.addEventListener('click', () => {
-        tabRankingBtn.className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-extrabold bg-slate-800 text-sky-300 shadow transition';
-        tabSkinsBtn.className = 'flex-1 sm:flex-initial px-3.5 py-2 rounded-lg text-xs font-extrabold text-slate-400 hover:text-slate-200 transition';
-        rankingPanel.classList.remove('hidden'); rankingPanel.classList.add('flex');
-        skinsPanel.classList.add('hidden'); skinsPanel.classList.remove('grid');
-        fetchAndRenderRanking();
-      });
-
-      document.getElementById('refreshRankingBtn').addEventListener('click', fetchAndRenderRanking);
 
       const vipModal = document.getElementById('vipModal');
       function openVipModal() {
@@ -1614,11 +1549,13 @@
         resetModal.classList.add('hidden'); resetModal.classList.remove('flex');
       });
       document.getElementById('resetConfirmBtn').addEventListener('click', () => {
-        state = defaultState();
-        aiStageIndex = 0;
-        saveState(true); updateUI();
+        matchScore = { player: 0, enemy: 0 };
+        document.getElementById('roundResultOverlay').classList.add('hidden');
+        document.getElementById('roundResultOverlay').classList.remove('flex');
+        resetRound();
+        updateUI();
         resetModal.classList.add('hidden'); resetModal.classList.remove('flex');
-        showToast('🔄 모든 배틀 기록이 초기화되었습니다.');
+        showToast('🔄 라운드가 초기화되었습니다.');
       });
 
       window.onload = async () => {
