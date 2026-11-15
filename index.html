@@ -1275,34 +1275,49 @@
         showToast('⚔️ 양쪽 준비완료! 재대결 시작!');
       });
 
-      function handleOpponentForfeit() {
+      let pvpExitReported = false;
+
+      function handleOpponentForfeit(reason = 'forfeit') {
         if (currentMode !== 'pvp' || !pvpRoomName || pvpForfeitHandled) return;
         pvpForfeitHandled = true;
         battleActive = false;
+        if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+        document.getElementById('countdownOverlay').classList.add('hidden');
+        document.getElementById('countdownOverlay').classList.remove('flex');
         state.wins += 1;
         saveState(true);
         const ro = document.getElementById('roundResultOverlay');
         ro.classList.add('hidden');
         ro.classList.remove('flex');
-        document.getElementById('matchWinnerId').textContent = '🏳️ 상대방이 포기했습니다';
+        const msg = reason === 'exit' ? '🚪 상대방이 대결에서 나갔습니다' : '🏳️ 상대방이 포기했습니다';
+        document.getElementById('matchWinnerId').textContent = msg;
         document.getElementById('matchResultLabel').textContent = '🏆 승리!';
         document.getElementById('matchResultHint').textContent = '👆 화면을 클릭하면 대기실로 이동합니다';
         const mb = document.getElementById('matchResultBanner');
         mb.classList.remove('hidden');
         mb.classList.add('flex');
-        showToast('🏳️ 상대방이 포기했습니다! 승리로 기록되었습니다.');
+        updateUI();
+        showToast(`${msg}! 승리로 기록되었습니다.`);
       }
 
-      socket.on('pvp_opponent_forfeit', () => {
-        handleOpponentForfeit();
+      socket.on('pvp_opponent_forfeit', (data) => {
+        handleOpponentForfeit(data?.reason || 'forfeit');
+      });
+      socket.on('opponent_disconnected', () => {
+        handleOpponentForfeit('exit');
+      });
+      socket.on('pvp_opponent_left', () => {
+        handleOpponentForfeit('exit');
       });
 
-      // 대전 중 그냥 게임(브라우저/탭) 종료 시 패배로 기록
-      window.addEventListener('beforeunload', () => {
-        if (currentMode === 'pvp' && pvpRoomName && battleActive) {
+      function reportPvpExitOnLeave() {
+        if (pvpExitReported) return;
+        if (currentMode === 'pvp' && pvpRoomName && !pvpForfeitHandled) {
+          pvpExitReported = true;
           state.losses += 1;
           try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
-          socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole });
+          socket.emit('sync_game_state', { room: pvpRoomName, role: pvpRole, forfeitSync: true, reason: 'exit' });
+          socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole, reason: 'exit' });
           if (authToken) {
             fetch(`${API_BASE_URL}/api/save`, {
               method: 'POST',
@@ -1312,7 +1327,11 @@
             }).catch(() => {});
           }
         }
-      });
+      }
+
+      // 대전 중 그냥 게임(브라우저/탭) 종료 시 패배로 기록 및 상대 승리 처리
+      window.addEventListener('beforeunload', reportPvpExitOnLeave);
+      window.addEventListener('pagehide', reportPvpExitOnLeave);
 
       document.getElementById('matchResultBanner').addEventListener('click', () => {
         const mb = document.getElementById('matchResultBanner');
@@ -1471,6 +1490,7 @@
       socket.on('match_started', (data) => {
         pvpRoomName = data.room;
         pvpForfeitHandled = false;
+        pvpExitReported = false;
         matchScore = { player: 0, enemy: 0 };
         pvpRole = (data.leftPlayer.socketId === socket.id) ? 'left' : 'right';
 
@@ -1530,7 +1550,7 @@
           return;
         }
         if (data.forfeitSync) {
-          handleOpponentForfeit();
+          handleOpponentForfeit(data.reason || 'forfeit');
           return;
         }
         if (data.hostState && pvpRole === 'right') {
@@ -1564,14 +1584,17 @@
       const gameAreaSection = document.getElementById('gameAreaSection');
 
       modePracticeTab.addEventListener('click', () => {
-        if (currentMode === 'pvp' && pvpRoomName && battleActive) {
+        if (currentMode === 'pvp' && pvpRoomName && !pvpForfeitHandled) {
           state.losses += 1;
           saveState(true);
-          socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole });
+          socket.emit('sync_game_state', { room: pvpRoomName, role: pvpRole, forfeitSync: true, reason: 'exit' });
+          socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole, reason: 'exit' });
           showToast('🏳️ 대전 중 나가기 처리되어 패배로 기록되었습니다.');
         }
+        battleActive = false;
         currentMode = 'practice';
         pvpRoomName = null;
+        pvpRole = null;
         socket.emit('leave_pvp_lobby');
         modePracticeTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow transition cursor-pointer';
         modePvPTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer';
@@ -1588,6 +1611,18 @@
       });
 
       modePvPTab.addEventListener('click', () => {
+        if (currentMode === 'pvp' && pvpRoomName && !pvpForfeitHandled) {
+          state.losses += 1;
+          saveState(true);
+          socket.emit('sync_game_state', { room: pvpRoomName, role: pvpRole, forfeitSync: true, reason: 'exit' });
+          socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole, reason: 'exit' });
+          showToast('🏳️ 대전 중 나가기 처리되어 패배로 기록되었습니다.');
+        }
+        battleActive = false;
+        pvpRoomName = null;
+        pvpRole = null;
+        document.getElementById('pvpInGameSkinBox').classList.add('hidden');
+        document.getElementById('pvpInGameSkinBox').classList.remove('flex');
         currentMode = 'pvp';
         modePracticeTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-slate-800 text-slate-300 hover:text-white transition cursor-pointer';
         modePvPTab.className = 'px-3.5 py-1.5 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow transition cursor-pointer';
