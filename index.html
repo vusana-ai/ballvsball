@@ -8,16 +8,8 @@
   <link rel="manifest" href="./manifest.json" />
   <title>공대공 — 바운스 배틀 아레나 & 대전모드</title>
   <script src="https://cdn.tailwindcss.com/3.4.17"></script>
-  <!-- Socket.io 클라이언트 (클라우드 서버 우선 연결) -->
-  <script>
-  (function(){
-    var isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-    var sc = document.createElement('script');
-    sc.src = (isLocal ? '' : 'https://02826k.duckdns.org') + '/socket.io/socket.io.js';
-    sc.onerror = function(){ window.noSocket = true; };
-    document.head.appendChild(sc);
-  })();
-  </script>
+  <!-- Socket.io 클라이언트 (동기 로드 보장) -->
+  <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
   <!-- 토스페이먼츠 결제위젯 SDK v2 -->
   <script src="https://js.tosspayments.com/v2/standard"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -493,7 +485,7 @@
         try {
           if (typeof io !== 'undefined') {
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            socket = isLocal ? io() : io('https://02826k.duckdns.org');
+            socket = isLocal ? io() : io('https://02826k.duckdns.org', { transports: ['websocket', 'polling'] });
             socket.on('connect', () => {
               if (badge) {
                 badge.textContent = '🟢 실시간 연결됨';
@@ -1106,11 +1098,14 @@
         gameAreaSection.classList.add('hidden');
 
         const myName = getDisplayName();
-        if (!waitingPlayers.some(p => (typeof p === 'string' ? p : p.username) === myName)) {
-          waitingPlayers = [{ username: myName, socketId: socket.id }, ...waitingPlayers];
+        if (!socket.connected) {
+          if (!waitingPlayers.some(p => (typeof p === 'string' ? p : p.username) === myName)) {
+            waitingPlayers = [{ username: myName, socketId: socket.id }, ...waitingPlayers];
+          }
+          renderWaitingList(waitingPlayers);
+        } else {
+          socket.emit('enter_pvp_lobby', { username: myName });
         }
-        renderWaitingList(waitingPlayers);
-        socket.emit('enter_pvp_lobby', { username: myName });
         showToast('⚔️ 실시간 대전 모드 대기실에 입장했습니다.');
       });
 
