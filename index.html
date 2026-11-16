@@ -231,7 +231,7 @@
 
     <!-- 중간 게임 화면 (연습 모드 및 매치 진행 시 표시) -->
     <section id="gameAreaSection" class="relative bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl shadow-black/40">
-      <div id="canvasWrapper" class="relative w-full h-[380px] sm:h-[440px] cursor-pointer bg-slate-950">
+      <div id="canvasWrapper" class="relative w-full aspect-[16/10] sm:aspect-auto sm:h-[440px] min-h-[250px] cursor-pointer bg-slate-950">
         <canvas id="gameCanvas" class="absolute inset-0 w-full h-full block"></canvas>
 
         <!-- 3-2-1 카운트다운 오버레이 -->
@@ -855,6 +855,7 @@
       }
 
       let lastTime = 0;
+      let lastSyncSentAt = 0;
       function gameLoop(timestamp) {
         try {
           const dt = lastTime ? Math.min(0.05, (timestamp - lastTime) / 1000) : 0.016;
@@ -1059,7 +1060,8 @@
               showRoundResultOverlay(playerWonRound ? 'left' : 'right');
             }
 
-            if (currentMode === 'pvp' && pvpRoomName && pvpRole === 'left') {
+            if (currentMode === 'pvp' && pvpRoomName && pvpRole === 'left' && (timestamp - lastSyncSentAt >= 32)) {
+              lastSyncSentAt = timestamp;
               socket.emit('sync_game_state', {
                 room: pvpRoomName,
                 role: pvpRole,
@@ -1518,6 +1520,7 @@
         document.getElementById('pvpLobbySection').classList.remove('flex');
         document.getElementById('gameAreaSection').classList.remove('hidden');
         resizeCanvas();
+        requestAnimationFrame(resizeCanvas);
         document.getElementById('pvpInGameSkinBox').classList.remove('hidden');
         document.getElementById('pvpInGameSkinBox').classList.add('flex');
 
@@ -1627,6 +1630,8 @@
         document.getElementById('pvpInGameSkinBox').classList.add('hidden');
         document.getElementById('pvpInGameSkinBox').classList.remove('flex');
         gameAreaSection.classList.remove('hidden');
+        resizeCanvas();
+        requestAnimationFrame(resizeCanvas);
         document.getElementById('playerLabelName').textContent = `🔵 ${getDisplayName()} (${getEquippedSkin().name})`;
         resetRound();
         showToast('⚽ 연습 모드로 전환되었습니다.');
@@ -2113,13 +2118,18 @@
         showToast('🔄 라운드가 초기화되었습니다.');
       });
 
-      window.onload = async () => {
+      function bootGame() {
         resizeCanvas();
         updateUI();
-        if (authToken) await loadFromServer();
         resetRound();
         requestAnimationFrame(gameLoop);
-      };
+        if (authToken) loadFromServer();
+      }
+      if (document.readyState === 'complete') {
+        bootGame();
+      } else {
+        window.addEventListener('load', bootGame);
+      }
     })();
   </script>
 </body>
