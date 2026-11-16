@@ -213,21 +213,16 @@
         </button>
       </div>
 
-      <!-- 대전모드 전용 승패 & 실시간 랭킹 -->
-      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800">
-        <div class="bg-slate-950/90 border border-amber-500/35 rounded-xl p-3 flex flex-col justify-center gap-1">
-          <div class="text-[11px] font-extrabold text-amber-300">📊 내 대전 전적 (대전모드)</div>
-          <div id="pvpMyRecordText" class="text-sm sm:text-base font-black text-slate-100 tabular-nums">0승 0패 (승률 0%)</div>
-          <div class="text-[10px] text-slate-400">대전모드 승패만 랭킹에 반영됩니다.</div>
-        </div>
-        <div class="sm:col-span-2 bg-slate-950/90 border border-slate-800 rounded-xl p-3">
+      <!-- 대전모드 전용 실시간 랭킹 TOP 10 (로그인 유저 실제 대전 기록만) -->
+      <div class="pt-2 border-t border-slate-800">
+        <div class="bg-slate-950/90 border border-slate-800 rounded-xl p-3">
           <div class="flex items-center justify-between mb-2">
-            <span class="text-xs font-extrabold text-amber-300">🏆 대전모드 랭킹 TOP 10</span>
+            <span class="text-xs font-extrabold text-amber-300">🏆 대전모드 랭킹 TOP 10 <span class="text-[10px] font-semibold text-slate-400">(로그인 유저 실제 대전 기록 · 승 많은 순)</span></span>
             <button id="pvpRankingRefreshBtn" type="button" class="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition cursor-pointer">
               🔄 새로고침
             </button>
           </div>
-          <div id="pvpRankingList" class="flex flex-col gap-1 max-h-36 overflow-y-auto text-[11px]">
+          <div id="pvpRankingList" class="flex flex-col gap-1 max-h-40 overflow-y-auto text-[11px]">
             <div class="text-slate-500">랭킹 정보를 불러오는 중...</div>
           </div>
         </div>
@@ -736,8 +731,10 @@
       const canvas = document.getElementById('gameCanvas');
       const ctx = canvas.getContext('2d');
       const canvasWrapper = document.getElementById('canvasWrapper');
-      let canvasWidth = 800;
-      let canvasHeight = 400;
+      const ARENA_W = 800;
+      const ARENA_H = 440;
+      let canvasWidth = ARENA_W;
+      let canvasHeight = ARENA_H;
 
       function resizeCanvas() {
         const rect = canvasWrapper.getBoundingClientRect();
@@ -762,15 +759,15 @@
       let countdownTimer = null;
 
       function resetRound() {
-        playerBall.x = canvasWidth * 0.25;
-        playerBall.y = canvasHeight * 0.5;
+        playerBall.x = ARENA_W * 0.25;
+        playerBall.y = ARENA_H * 0.5;
         playerBall.vx = (Math.random() - 0.5) * 3 + 2.5;
         playerBall.vy = (Math.random() - 0.5) * 3;
         playerBall.maxHp = 1000;
         playerBall.hp = playerBall.maxHp;
 
-        enemyBall.x = canvasWidth * 0.75;
-        enemyBall.y = canvasHeight * 0.5;
+        enemyBall.x = ARENA_W * 0.75;
+        enemyBall.y = ARENA_H * 0.5;
         enemyBall.vx = (Math.random() - 0.5) * 3 - 2.5;
         enemyBall.vy = (Math.random() - 0.5) * 3;
 
@@ -879,9 +876,9 @@
             const aiSkin = getActiveRightSkin();
             let hitWall = false;
             if (playerBall.x - playerBall.radius < 0) { playerBall.x = playerBall.radius; playerBall.vx *= -1; hitWall = true; }
-            if (playerBall.x + playerBall.radius > canvasWidth) { playerBall.x = canvasWidth - playerBall.radius; playerBall.vx *= -1; hitWall = true; }
+            if (playerBall.x + playerBall.radius > ARENA_W) { playerBall.x = ARENA_W - playerBall.radius; playerBall.vx *= -1; hitWall = true; }
             if (playerBall.y - playerBall.radius < 0) { playerBall.y = playerBall.radius; playerBall.vy *= -1; hitWall = true; }
-            if (playerBall.y + playerBall.radius > canvasHeight) { playerBall.y = canvasHeight - playerBall.radius; playerBall.vy *= -1; hitWall = true; }
+            if (playerBall.y + playerBall.radius > ARENA_H) { playerBall.y = ARENA_H - playerBall.radius; playerBall.vy *= -1; hitWall = true; }
 
             if (hitWall && skin.skill === 'web') {
               if (webs.length >= 10) webs.shift();
@@ -890,9 +887,9 @@
 
             let aiHitWall = false;
             if (enemyBall.x - enemyBall.radius < 0) { enemyBall.x = enemyBall.radius; enemyBall.vx *= -1; aiHitWall = true; }
-            if (enemyBall.x + enemyBall.radius > canvasWidth) { enemyBall.x = canvasWidth - enemyBall.radius; enemyBall.vx *= -1; aiHitWall = true; }
+            if (enemyBall.x + enemyBall.radius > ARENA_W) { enemyBall.x = ARENA_W - enemyBall.radius; enemyBall.vx *= -1; aiHitWall = true; }
             if (enemyBall.y - enemyBall.radius < 0) { enemyBall.y = enemyBall.radius; enemyBall.vy *= -1; aiHitWall = true; }
-            if (enemyBall.y + enemyBall.radius > canvasHeight) { enemyBall.y = canvasHeight - enemyBall.radius; enemyBall.vy *= -1; aiHitWall = true; }
+            if (enemyBall.y + enemyBall.radius > ARENA_H) { enemyBall.y = ARENA_H - enemyBall.radius; enemyBall.vy *= -1; aiHitWall = true; }
 
             if (aiHitWall && aiSkin.skill === 'web') {
               if (webs.length >= 10) webs.shift();
@@ -983,7 +980,7 @@
             for (let i = projectiles.length - 1; i >= 0; i--) {
               let pr = projectiles[i];
               pr.x += pr.vx; pr.y += pr.vy;
-              if (pr.x < 0 || pr.x > canvasWidth || pr.y < 0 || pr.y > canvasHeight) { projectiles.splice(i, 1); continue; }
+              if (pr.x < 0 || pr.x > ARENA_W || pr.y < 0 || pr.y > ARENA_H) { projectiles.splice(i, 1); continue; }
               const target = pr.owner === 'player' ? enemyBall : playerBall;
               if (Math.hypot(target.x - pr.x, target.y - pr.y) < target.radius + pr.radius) {
                 target.hp = Math.max(0, target.hp - 16);
@@ -1067,8 +1064,10 @@
                 room: pvpRoomName,
                 role: pvpRole,
                 hostState: true,
-                leftBall: { x: playerBall.x, y: playerBall.y, hp: playerBall.hp, maxHp: playerBall.maxHp },
-                rightBall: { x: enemyBall.x, y: enemyBall.y, hp: enemyBall.hp, maxHp: enemyBall.maxHp },
+                leftBall: { x: playerBall.x, y: playerBall.y, hp: playerBall.hp, maxHp: playerBall.maxHp, daggerAngle: playerBall.daggerAngle },
+                rightBall: { x: enemyBall.x, y: enemyBall.y, hp: enemyBall.hp, maxHp: enemyBall.maxHp, daggerAngle: enemyBall.daggerAngle },
+                projectiles: projectiles.map(p => ({ x: p.x, y: p.y, radius: p.radius, color: p.color })),
+                webs: webs.map(w => ({ x: w.x, y: w.y, radius: w.radius, life: w.life })),
                 matchScore
               });
             }
@@ -1083,14 +1082,24 @@
 
           ctx.clearRect(0, 0, canvasWidth, canvasHeight);
 
+          const scale = Math.min(canvasWidth / ARENA_W, canvasHeight / ARENA_H);
+          const offsetX = (canvasWidth - ARENA_W * scale) * 0.5;
+          const offsetY = (canvasHeight - ARENA_H * scale) * 0.5;
+          ctx.save();
+          ctx.translate(offsetX, offsetY);
+          ctx.scale(scale, scale);
+
           ctx.strokeStyle = 'rgba(51, 65, 85, 0.25)';
           ctx.lineWidth = 1;
-          for (let x = 0; x < canvasWidth; x += 40) {
-            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvasHeight); ctx.stroke();
+          for (let x = 0; x <= ARENA_W; x += 40) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, ARENA_H); ctx.stroke();
           }
-          for (let y = 0; y < canvasHeight; y += 40) {
-            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvasWidth, y); ctx.stroke();
+          for (let y = 0; y <= ARENA_H; y += 40) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(ARENA_W, y); ctx.stroke();
           }
+          ctx.strokeStyle = 'rgba(59, 130, 246, 0.4)';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(1, 1, ARENA_W - 2, ARENA_H - 2);
 
           for (let i = particles.length - 1; i >= 0; i--) {
             const pt = particles[i];
@@ -1169,6 +1178,8 @@
           ctx.fillText(Math.round(enemyBall.hp), enemyBall.x, enemyBall.y);
           ctx.restore();
 
+          ctx.restore();
+
           document.getElementById('playerHpText').textContent = `${Math.round(playerBall.hp)} / ${playerBall.maxHp}`;
           document.getElementById('playerHpBar').style.width = `${Math.max(0, (playerBall.hp / playerBall.maxHp) * 100)}%`;
           document.getElementById('enemyHpText').textContent = `${Math.round(enemyBall.hp)} / ${enemyBall.maxHp}`;
@@ -1189,7 +1200,7 @@
           : (formatResultId(document.getElementById('enemyLabelName').textContent) || '오른쪽');
         const winnerName = winnerSide === 'left' ? leftName : rightName;
 
-        if (currentMode === 'pvp') {
+        if (currentMode === 'pvp' && authToken) {
           if (iWon) state.wins += 1;
           else state.losses += 1;
           saveState(true);
@@ -1256,10 +1267,12 @@
         const ro = document.getElementById('roundResultOverlay');
         ro.classList.add('hidden'); ro.classList.remove('flex');
         if (currentMode === 'pvp') {
-          state.losses += 1;
-          saveState(true);
+          if (authToken) {
+            state.losses += 1;
+            saveState(true);
+          }
           if (pvpRoomName) { socket.emit('sync_game_state', { room: pvpRoomName, role: pvpRole, forfeitSync: true }); socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole }); }
-          showToast('🏳️ 기권하여 패배로 기록되었습니다.');
+          showToast(authToken ? '🏳️ 기권하여 패배로 기록되었습니다.' : '🏳️ 기권했습니다. (게스트는 전적 미기록)');
           returnBothToPvpLobby();
         } else {
           matchScore = { player: 0, enemy: 0 };
@@ -1284,8 +1297,10 @@
         if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
         document.getElementById('countdownOverlay').classList.add('hidden');
         document.getElementById('countdownOverlay').classList.remove('flex');
-        state.wins += 1;
-        saveState(true);
+        if (authToken) {
+          state.wins += 1;
+          saveState(true);
+        }
         const ro = document.getElementById('roundResultOverlay');
         ro.classList.add('hidden');
         ro.classList.remove('flex');
@@ -1314,11 +1329,11 @@
         if (pvpExitReported) return;
         if (currentMode === 'pvp' && pvpRoomName && !pvpForfeitHandled) {
           pvpExitReported = true;
-          state.losses += 1;
-          try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
           socket.emit('sync_game_state', { room: pvpRoomName, role: pvpRole, forfeitSync: true, reason: 'exit' });
           socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole, reason: 'exit' });
           if (authToken) {
+            state.losses += 1;
+            try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) {}
             fetch(`${API_BASE_URL}/api/save`, {
               method: 'POST',
               keepalive: true,
@@ -1502,6 +1517,7 @@
         document.getElementById('pvpLobbySection').classList.add('hidden');
         document.getElementById('pvpLobbySection').classList.remove('flex');
         document.getElementById('gameAreaSection').classList.remove('hidden');
+        resizeCanvas();
         document.getElementById('pvpInGameSkinBox').classList.remove('hidden');
         document.getElementById('pvpInGameSkinBox').classList.add('flex');
 
@@ -1559,13 +1575,17 @@
             playerBall.y = data.leftBall.y;
             playerBall.hp = data.leftBall.hp;
             playerBall.maxHp = data.leftBall.maxHp || 1000;
+            if (typeof data.leftBall.daggerAngle === 'number') playerBall.daggerAngle = data.leftBall.daggerAngle;
           }
           if (data.rightBall) {
             enemyBall.x = data.rightBall.x;
             enemyBall.y = data.rightBall.y;
             enemyBall.hp = data.rightBall.hp;
             enemyBall.maxHp = data.rightBall.maxHp || 1000;
+            if (typeof data.rightBall.daggerAngle === 'number') enemyBall.daggerAngle = data.rightBall.daggerAngle;
           }
+          if (Array.isArray(data.projectiles)) projectiles = data.projectiles;
+          if (Array.isArray(data.webs)) webs = data.webs;
           if (data.matchScore) {
             matchScore = data.matchScore;
             document.getElementById('matchScoreText').textContent = `${matchScore.player} : ${matchScore.enemy}`;
@@ -1585,11 +1605,13 @@
 
       modePracticeTab.addEventListener('click', () => {
         if (currentMode === 'pvp' && pvpRoomName && !pvpForfeitHandled) {
-          state.losses += 1;
-          saveState(true);
+          if (authToken) {
+            state.losses += 1;
+            saveState(true);
+          }
           socket.emit('sync_game_state', { room: pvpRoomName, role: pvpRole, forfeitSync: true, reason: 'exit' });
           socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole, reason: 'exit' });
-          showToast('🏳️ 대전 중 나가기 처리되어 패배로 기록되었습니다.');
+          showToast(authToken ? '🏳️ 대전 중 나가기 처리되어 패배로 기록되었습니다.' : '🏳️ 대전 중 나갔습니다. (게스트는 전적 미기록)');
         }
         battleActive = false;
         currentMode = 'practice';
@@ -1612,11 +1634,13 @@
 
       modePvPTab.addEventListener('click', () => {
         if (currentMode === 'pvp' && pvpRoomName && !pvpForfeitHandled) {
-          state.losses += 1;
-          saveState(true);
+          if (authToken) {
+            state.losses += 1;
+            saveState(true);
+          }
           socket.emit('sync_game_state', { room: pvpRoomName, role: pvpRole, forfeitSync: true, reason: 'exit' });
           socket.emit('pvp_forfeit', { room: pvpRoomName, role: pvpRole, reason: 'exit' });
-          showToast('🏳️ 대전 중 나가기 처리되어 패배로 기록되었습니다.');
+          showToast(authToken ? '🏳️ 대전 중 나가기 처리되어 패배로 기록되었습니다.' : '🏳️ 대전 중 나갔습니다. (게스트는 전적 미기록)');
         }
         battleActive = false;
         pvpRoomName = null;
@@ -1761,14 +1785,7 @@
 
       function updateUI() {
         const skin = getEquippedSkin();
-        const totalGames = state.wins + state.losses;
-        const winRate = totalGames > 0 ? Math.round((state.wins / totalGames) * 100) : 0;
-
         document.getElementById('equippedSkinDisplay').textContent = skin.name;
-        const pvpRecordEl = document.getElementById('pvpMyRecordText');
-        if (pvpRecordEl) {
-          pvpRecordEl.textContent = `${state.wins}승 ${state.losses}패 (승률 ${winRate}%)`;
-        }
 
         const vipLabel = document.getElementById('vipHeaderBtnLabel');
         vipLabel.textContent = state.isVip ? 'VIP 적용중' : 'VIP';
@@ -1791,25 +1808,26 @@
           if (res.ok) {
             const data = await res.json();
             const rawList = Array.isArray(data) ? data : (data.rankings || data.ranking || []);
-            rows = rawList.map(item => {
-              const sd = item.saveData || item.save_data || {};
-              const w = typeof sd.wins === 'number' ? sd.wins : (typeof item.score === 'number' ? item.score : 0);
-              const l = typeof sd.losses === 'number' ? sd.losses : 0;
-              return { username: item.username || '유저', wins: w, losses: l };
-            });
+            rows = rawList
+              .map(item => {
+                const sd = item.saveData || item.save_data || {};
+                const uname = String(item.username || item.maskedName || '').trim();
+                const w = typeof sd.wins === 'number' ? sd.wins : (typeof item.score === 'number' ? item.score : 0);
+                const l = typeof sd.losses === 'number' ? sd.losses : 0;
+                return { username: uname, wins: w, losses: l, isMe: Boolean(item.isMe) };
+              })
+              .filter(r => r.username && !r.username.startsWith('게스트') && (r.wins + r.losses) > 0);
           }
         } catch (e) {}
 
-        if (rows.length === 0) {
-          rows = [{ username: getDisplayName(), wins: state.wins, losses: state.losses, isLocal: true }];
-        }
-
         rows.sort((a, b) => (b.wins - a.wins) || (a.losses - b.losses));
         listEl.innerHTML = '';
+        if (rows.length === 0) {
+          listEl.innerHTML = '<div class="text-slate-500 py-2 text-center">아직 실제 대전 기록이 없습니다. (로그인 유저만 기록됩니다)</div>';
+          return;
+        }
         rows.slice(0, 10).forEach((r, idx) => {
-          const total = r.wins + r.losses;
-          const rate = total > 0 ? Math.round((r.wins / total) * 100) : 0;
-          const isMe = currentUsername ? r.username === currentUsername : r.isLocal;
+          const isMe = r.isMe || (currentUsername && r.username === currentUsername);
           const rowDiv = document.createElement('div');
           rowDiv.className = 'flex items-center justify-between px-2.5 py-1.5 rounded-lg border ' + (
             isMe ? 'bg-blue-500/15 border-blue-500/40 text-blue-200 font-bold' : 'bg-slate-900/80 border-slate-800 text-slate-300'
@@ -1818,7 +1836,7 @@
           const displayId = formatResultId(r.username) || r.username;
           rowDiv.innerHTML = `
             <span class="truncate">${medal} ${displayId}${isMe ? ' (나)' : ''}</span>
-            <span class="shrink-0 tabular-nums text-amber-300 font-extrabold">${r.wins}승 ${r.losses}패 (${rate}%)</span>
+            <span class="shrink-0 tabular-nums text-amber-300 font-extrabold">${r.wins}승 ${r.losses}패</span>
           `;
           listEl.appendChild(rowDiv);
         });
